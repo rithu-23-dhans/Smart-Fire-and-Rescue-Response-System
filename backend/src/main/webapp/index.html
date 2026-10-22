@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Smart Fire & Rescue Response System</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="brand"><span class="brand-icon">✚</span><div><b>FIRE & RESCUE</b><small>RESPONSE COMMAND</small></div></div>
+    <nav>
+      <a class="active" href="#overview">▦ &nbsp; Overview</a>
+      <a href="#incidents">⚑ &nbsp; Incidents</a>
+      <a href="#units">🚒 &nbsp; Response Units</a>
+      <a href="#actions">⌁ &nbsp; Routes and recalculation</a>
+    </nav>
+    <div class="sidebar-note"><span class="pulse"></span> Local response system<br><small>Connected to Java backend</small></div>
+  </aside>
+  <main>
+    <header><div><p class="eyebrow">EMERGENCY OPERATIONS</p><h1>Response Dashboard</h1><p class="sub">Monitor incidents, coordinate response units, and manage routes.</p></div><button class="secondary" id="refresh">↻ Refresh data</button></header>
+    <section id="overview" class="stats">
+      <article class="stat"><span>Recorded incidents</span><strong id="incidentCount">—</strong><small>All statuses</small></article>
+      <article class="stat"><span>Pending incidents</span><strong id="pendingCount">—</strong><small>Ordered by priority</small></article>
+      <article class="stat"><span>Units deployed</span><strong id="activeCount">—</strong><small>Currently assigned</small></article>
+      <article class="stat"><span>Available units</span><strong id="availableCount">—</strong><small>Ready for dispatch</small></article>
+    </section>
+    <section class="panel" id="actions">
+      <div class="section-heading"><div><p class="eyebrow">OPERATIONS</p><h2>Incident actions</h2></div></div>
+      <div class="action-grid">
+        <form id="reportForm" class="action-card">
+          <h3>＋ Report incident</h3>
+          <label>Location<select name="location" id="location" required></select></label>
+          <label>Incident type<select name="type"><option>Fire</option><option>Industrial Fire</option><option>Rescue</option><option>Accident</option></select></label>
+          <div class="two"><label>Severity (1–10)<input name="intensity" type="number" min="1" max="10" value="5" required></label><label>People affected<input name="population" type="number" min="0" max="100000" value="1" required></label></div>
+          <label class="check"><input name="critical" type="checkbox"> Critical infrastructure affected</label>
+          <button type="submit">Register incident</button>
+        </form>
+        <div class="action-card">
+          <h3>🚒 Dispatch & mission</h3>
+          <p>Dispatch the highest-priority pending incident to the nearest available compatible unit.</p>
+          <button id="dispatchBtn">Dispatch next incident</button>
+          <div class="divider"></div>
+          <label>Unit ID<select id="unitSelect"></select></label>
+          <div class="two"><button class="secondary" id="trackBtn">Track unit</button><button class="secondary" id="completeBtn">Complete mission</button></div>
+        </div>
+        <form id="updateForm" class="action-card">
+          <h3>⇅ Update pending priority</h3>
+          <label>Incident ID<input name="id" placeholder="e.g. I01" required></label>
+          <div class="two"><label>Severity<input name="intensity" type="number" min="1" max="10" required></label><label>People affected<input name="population" type="number" min="0" max="100000" required></label></div>
+          <label class="check"><input name="critical" type="checkbox"> Critical infrastructure affected</label>
+          <button type="submit">Update incident</button>
+        </form>
+        <form id="roadForm" class="action-card">
+          <h3>⛔ Close a road</h3>
+          <p>Close a direct connection and recalculate routes for active units.</p>
+          <label>First location<select name="from" class="location-select" required></select></label>
+          <label>Second location<select name="to" class="location-select" required></select></label>
+          <button type="submit" class="danger">Close road</button>
+        </form>
+        <form id="routeForm" class="action-card">
+          <h3>⌁ Find fastest route</h3>
+          <label>Starting location<select name="start" class="location-select" required></select></label>
+          <label>Destination<select name="end" class="location-select" required></select></label>
+          <button type="submit">Calculate route</button>
+          <div id="routeResult" class="result hidden"></div>
+        </form>
+      </div>
+      <div id="notice" class="notice hidden" role="status"></div>
+    </section>
+    <section class="panel" id="incidents">
+      <div class="section-heading"><div><p class="eyebrow">PRIORITY QUEUE VIEW</p><h2>Incidents</h2></div><span class="pill">Sorted by original priority rules</span></div>
+      <div class="table-wrap"><table><thead><tr><th>ID</th><th>Incident</th><th>Location</th><th>Severity</th><th>People</th><th>Critical</th><th>Status</th><th>Unit</th></tr></thead><tbody id="incidentRows"></tbody></table></div>
+    </section>
+    <section class="panel" id="units">
+      <div class="section-heading"><div><p class="eyebrow">FLEET STATUS</p><h2>Response units</h2></div></div>
+      <div id="unitCards" class="unit-grid"></div>
+    </section>
+    <footer>Smart Fire and Rescue Response System · Java Servlets · JDBC · MySQL</footer>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
