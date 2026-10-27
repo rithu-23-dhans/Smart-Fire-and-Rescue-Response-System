@@ -3,43 +3,69 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Sudar Emergency Response Â· Citizen Portal</title>
+  <title>Sudar Fire &amp; Rescue · Citizen Portal</title>
+  <meta name="description" content="Report emergencies, track dispatch units, and manage your incident history on the Sudar Fire &amp; Rescue Citizen Portal.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <div class="app-container">
+
+    <!-- ===== HEADER ===== -->
     <header class="app-header">
       <div class="brand">
-        <div class="brand-icon">âœš</div>
+        <div class="brand-icon">🔥</div>
         <div class="brand-titles">
-          <h1>Sudar Fire & Rescue</h1>
-          <p>Emergency Response & Public Operations</p>
+          <h1>Sudar Fire &amp; Rescue</h1>
+          <p>Emergency Response &amp; Public Operations</p>
         </div>
       </div>
       <div class="header-actions">
-        <div style="font-size: 0.85rem; color: var(--text-muted); text-align: right; margin-right: 8px;">
-          <div><b>EMERGENCY HOTLINE</b></div>
-          <div style="color: var(--danger); font-weight: bold; font-size: 1.05rem;">Dial 101 or 112</div>
+        <div class="emergency-info">
+          <div>EMERGENCY HOTLINE</div>
+          <div class="emergency-number">Dial 101 or 112</div>
         </div>
-        <a href="admin.html" class="btn secondary">Admin Console ðŸ”’</a>
+
+        <!-- Logged-out state -->
+        <div id="headerGuest" class="header-auth-btns">
+          <button id="btnOpenLogin" class="btn secondary btn-sm" onclick="openAuthModal('login')">Sign In</button>
+          <button id="btnOpenRegister" class="btn btn-sm" onclick="openAuthModal('register')">Create Account</button>
+        </div>
+
+        <!-- Logged-in state -->
+        <div id="headerUser" class="user-chip hidden" onclick="switchTab('tab-profile')">
+          <div class="user-avatar" id="userAvatar">?</div>
+          <div>
+            <div class="user-chip-name" id="userChipName">—</div>
+            <div class="user-chip-sub">My Profile</div>
+          </div>
+          <button class="btn-logout" id="btnLogout" title="Sign out" onclick="handleLogout(event)">✕</button>
+        </div>
+
+        <a href="admin.html" class="btn secondary btn-sm">Admin Console 🔒</a>
       </div>
     </header>
 
     <div id="globalNotice" class="alert hidden" role="status"></div>
 
+    <!-- ===== TABS ===== -->
     <nav class="nav-tabs" role="tablist">
-      <button class="nav-tab active" data-tab="tab-report">ðŸš¨ &nbsp; Report Emergency</button>
-      <button class="nav-tab" data-tab="tab-track">ðŸ” &nbsp; Track Incident & Unit</button>
-      <button class="nav-tab" data-tab="tab-route">ðŸ—ºï¸ &nbsp; Find Fastest Route</button>
+      <button class="nav-tab active" data-tab="tab-report">🚨 &nbsp; Report Emergency</button>
+      <button class="nav-tab" data-tab="tab-track">🔍 &nbsp; Track Incident &amp; Unit</button>
+      <button class="nav-tab" data-tab="tab-route">🗺️ &nbsp; Find Fastest Route</button>
+      <button class="nav-tab nav-tab-profile hidden" id="navTabProfile" data-tab="tab-profile">👤 &nbsp; My Profile</button>
     </nav>
 
-    <!-- TAB 1: REPORT EMERGENCY INCIDENT -->
+    <!-- ===================================================================== -->
+    <!-- TAB 1: REPORT EMERGENCY                                               -->
+    <!-- ===================================================================== -->
     <main id="tab-report" class="tab-content active">
       <div class="panel">
         <div class="panel-header">
           <div>
             <h2>Report an Emergency Incident</h2>
-            <p>Immediate public reporting. No login or registration required.</p>
+            <p>Immediate public reporting. No login required — anyone can report an emergency.</p>
           </div>
           <span class="badge badge-pending">Active Dispatch System</span>
         </div>
@@ -49,7 +75,7 @@
             <div class="form-group">
               <label for="reportLocation">Incident Location *</label>
               <select id="reportLocation" name="location" required>
-                <option value="">Loading Sudar locations...</option>
+                <option value="">Loading Sudar locations…</option>
               </select>
             </div>
 
@@ -66,9 +92,7 @@
             <div class="form-group">
               <label for="reportIntensity">Severity Level (1 to 10) *</label>
               <input type="number" id="reportIntensity" name="intensity" min="1" max="10" value="7" required>
-              <small style="color: var(--text-muted); display: block; margin-top: 4px;">
-                1â€“3: Minor Â· 4â€“6: Moderate Â· 7â€“8: Severe Â· 9â€“10: Critical Emergency
-              </small>
+              <small class="form-hint">1–3: Minor · 4–6: Moderate · 7–8: Severe · 9–10: Critical Emergency</small>
             </div>
 
             <div class="form-group">
@@ -84,55 +108,64 @@
             </div>
 
             <div class="form-group full-width">
-              <label for="reportDesc">Situation Details & Landmarks</label>
-              <textarea id="reportDesc" name="description" rows="3" placeholder="Describe the scene, trapped individuals, spread of fire, or access road conditions..." required></textarea>
+              <label for="reportDesc">Situation Details &amp; Landmarks</label>
+              <textarea id="reportDesc" name="description" rows="3"
+                placeholder="Describe the scene, trapped individuals, spread of fire, or access road conditions…" required></textarea>
             </div>
           </div>
 
-          <div style="margin-top: 20px;">
-            <button type="submit" class="btn danger" style="padding: 12px 28px; font-size: 1rem;">
-              ðŸš¨ Submit Emergency Report
+          <div class="form-actions">
+            <button type="submit" id="btnSubmitReport" class="btn danger btn-lg">
+              🚨 Submit Emergency Report
             </button>
           </div>
         </form>
 
         <!-- SUBMISSION SUCCESS CARD -->
-        <div id="reportSuccessCard" class="panel hidden" style="background: var(--bg-surface-elevated); margin-top: 24px; border-color: var(--success);">
-          <div class="panel-header" style="border-bottom-color: rgba(16, 185, 129, 0.3);">
+        <div id="reportSuccessCard" class="success-card hidden">
+          <div class="success-card-header">
+            <div class="success-icon">✔</div>
             <div>
-              <h3 style="color: var(--success);">âœ“ Incident Registered in System</h3>
+              <h3>Incident Registered in System</h3>
               <p>Keep your reference details safe to track response unit status.</p>
             </div>
           </div>
-          <div class="form-grid" style="margin-bottom: 16px;">
-            <div class="stat-card">
+
+          <div class="success-details">
+            <div class="stat-card highlight-blue">
               <span>Incident Reference ID</span>
-              <strong id="createdIncidentId" style="color: #38bdf8;">â€”</strong>
+              <strong id="createdIncidentId">—</strong>
             </div>
-            <div class="stat-card">
+            <div class="stat-card highlight-yellow">
               <span>Secure Tracking Token</span>
-              <strong id="createdTrackingToken" style="font-size: 1.25rem; font-family: monospace; color: #fbbf24;">â€”</strong>
+              <strong id="createdTrackingToken" class="mono">—</strong>
             </div>
           </div>
-          <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-            <button type="button" id="copyTokenBtn" class="btn secondary">ðŸ“‹ Copy Tracking Token</button>
-            <button type="button" id="quickTrackBtn" class="btn">ðŸ” Track Response Unit Now</button>
+
+          <div class="success-actions">
+            <button type="button" id="copyTokenBtn" class="btn secondary btn-sm">📋 Copy Token</button>
+            <button type="button" id="quickTrackBtn" class="btn btn-sm">🔍 Track Now</button>
           </div>
+
+          <!-- Post-report: link incident to account -->
+          <div id="postReportLink" class="post-report-section hidden"></div>
         </div>
       </div>
     </main>
 
-    <!-- TAB 2: TRACK INCIDENT & UNIT -->
+    <!-- ===================================================================== -->
+    <!-- TAB 2: TRACK INCIDENT & UNIT                                          -->
+    <!-- ===================================================================== -->
     <section id="tab-track" class="tab-content">
       <div class="panel">
         <div class="panel-header">
           <div>
-            <h2>Track Incident & Response Unit</h2>
-            <p>Look up live response unit dispatch, current location, and incident timeline.</p>
+            <h2>Track Incident &amp; Response Unit</h2>
+            <p>Look up live dispatch, current location, and incident timeline.</p>
           </div>
         </div>
 
-        <form id="trackForm" style="margin-bottom: 24px;">
+        <form id="trackForm" style="margin-bottom:24px">
           <div class="form-grid">
             <div class="form-group">
               <label for="trackId">Incident Reference ID</label>
@@ -140,55 +173,53 @@
             </div>
             <div class="form-group">
               <label for="trackToken">Secure Tracking Token</label>
-              <input type="text" id="trackToken" placeholder="e.g. tr_a1b2c3d4..." required>
+              <input type="text" id="trackToken" placeholder="e.g. tr_a1b2c3d4…" required>
             </div>
           </div>
-          <button type="submit" class="btn">ðŸ” Track Incident Status</button>
+          <button type="submit" class="btn">🔍 Track Incident Status</button>
         </form>
 
         <div id="trackResult" class="hidden">
-          <div class="form-grid" style="margin-bottom: 24px;">
-            <!-- INCIDENT DETAILS -->
-            <div class="stat-card" style="grid-column: span 1;">
+          <div class="form-grid" style="margin-bottom:24px">
+            <div class="stat-card">
               <span>Incident Details</span>
-              <div style="display: flex; align-items: center; gap: 10px; margin-top: 6px;">
-                <strong id="trackDisplayId" style="font-size: 1.5rem;">â€”</strong>
+              <div style="display:flex;align-items:center;gap:10px;margin-top:6px">
+                <strong id="trackDisplayId" style="font-size:1.5rem">—</strong>
                 <span id="trackDisplayStatus" class="badge badge-pending">Pending</span>
               </div>
-              <div class="unit-meta" style="margin-top: 10px;">
-                <div><span>Location:</span> <b id="trackDisplayLoc">â€”</b></div>
-                <div><span>Type:</span> <b id="trackDisplayType">â€”</b></div>
-                <div><span>Severity:</span> <b id="trackDisplaySeverity">â€”</b></div>
-                <div><span>Critical:</span> <b id="trackDisplayCritical">â€”</b></div>
-                <div style="margin-top: 6px; font-style: italic; color: var(--text-muted);" id="trackDisplayDesc">â€”</div>
+              <div class="unit-meta" style="margin-top:10px">
+                <div><span>Location:</span> <b id="trackDisplayLoc">—</b></div>
+                <div><span>Type:</span> <b id="trackDisplayType">—</b></div>
+                <div><span>Severity:</span> <b id="trackDisplaySeverity">—</b></div>
+                <div><span>Critical:</span> <b id="trackDisplayCritical">—</b></div>
+                <div style="margin-top:6px;font-style:italic;color:var(--text-muted)" id="trackDisplayDesc">—</div>
               </div>
             </div>
 
-            <!-- UNIT DETAILS -->
-            <div class="stat-card" style="grid-column: span 1;">
+            <div class="stat-card">
               <span>Assigned Response Unit</span>
-              <div id="trackNoUnit" style="color: var(--warning); padding: 10px 0;">
-                â³ Waiting for unit dispatch. Incident is prioritized in the emergency queue.
+              <div id="trackNoUnit" style="color:var(--warning);padding:10px 0">
+                ⏳ Waiting for unit dispatch. Incident is prioritized in the emergency queue.
               </div>
               <div id="trackUnitDetails" class="hidden">
-                <div style="display: flex; align-items: center; gap: 10px; margin-top: 6px;">
-                  <strong id="trackUnitId" style="font-size: 1.5rem; color: #38bdf8;">â€”</strong>
+                <div style="display:flex;align-items:center;gap:10px;margin-top:6px">
+                  <strong id="trackUnitId" style="font-size:1.5rem;color:#38bdf8">—</strong>
                   <span id="trackUnitType" class="badge badge-en-route">Fire Engine</span>
                 </div>
-                <div class="unit-meta" style="margin-top: 10px;">
-                  <div><span>Current Waypoint:</span> <b id="trackUnitLoc">â€”</b></div>
-                  <div><span>Mission Status:</span> <b id="trackUnitStatus">â€”</b></div>
+                <div class="unit-meta" style="margin-top:10px">
+                  <div><span>Current Waypoint:</span> <b id="trackUnitLoc">—</b></div>
+                  <div><span>Mission Status:</span> <b id="trackUnitStatus">—</b></div>
                 </div>
-                <div style="margin-top: 8px;">
-                  <span style="font-size: 0.8rem; text-transform: uppercase;">Route Progress:</span>
+                <div style="margin-top:8px">
+                  <span style="font-size:0.8rem;text-transform:uppercase">Route Progress:</span>
                   <div id="trackRoutePath" class="route-path"></div>
                 </div>
               </div>
             </div>
           </div>
 
-          <!-- WITNESS / CITIZEN UPDATE -->
-          <div class="panel" style="background: var(--bg-surface-elevated); margin-bottom: 24px;">
+          <!-- Citizen Update -->
+          <div class="panel" style="background:var(--bg-surface-elevated);margin-bottom:24px">
             <div class="panel-header">
               <div>
                 <h3>Submit Citizen Situation Update</h3>
@@ -197,22 +228,25 @@
             </div>
             <form id="witnessUpdateForm">
               <div class="form-group">
-                <textarea id="updateNoteText" rows="2" placeholder="e.g. Fire has spread to the east annex; road is clear for entry from south gate..." required></textarea>
+                <textarea id="updateNoteText" rows="2"
+                  placeholder="e.g. Fire has spread to the east annex; road is clear for entry from south gate…" required></textarea>
               </div>
               <button type="submit" class="btn secondary">Post Situation Update</button>
             </form>
           </div>
 
-          <!-- TIMELINE -->
+          <!-- Timeline -->
           <div>
-            <h3 style="margin-bottom: 12px; color: #fff;">Response Timeline & Audit Log</h3>
+            <h3 style="margin-bottom:12px;color:#fff">Response Timeline &amp; Audit Log</h3>
             <ul id="timelineList" class="timeline"></ul>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- TAB 3: ROUTE FINDER -->
+    <!-- ===================================================================== -->
+    <!-- TAB 3: ROUTE FINDER                                                   -->
+    <!-- ===================================================================== -->
     <section id="tab-route" class="tab-content">
       <div class="panel">
         <div class="panel-header">
@@ -222,7 +256,7 @@
           </div>
         </div>
 
-        <form id="publicRouteForm" style="margin-bottom: 24px;">
+        <form id="publicRouteForm" style="margin-bottom:24px">
           <div class="form-grid">
             <div class="form-group">
               <label for="routeStart">Origin Location</label>
@@ -239,17 +273,120 @@
         <div id="routeOutput" class="hidden">
           <div class="stat-card">
             <span>Fastest Route Result</span>
-            <div id="routeTravelTime" style="font-size: 1.5rem; font-weight: bold; color: #38bdf8; margin: 8px 0;">â€”</div>
-            <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 8px;">Waypoint Sequence:</div>
+            <div id="routeTravelTime" style="font-size:1.5rem;font-weight:bold;color:#38bdf8;margin:8px 0">—</div>
+            <div style="font-size:0.85rem;color:var(--text-muted);margin-bottom:8px">Waypoint Sequence:</div>
             <div id="routePathNodes" class="route-path"></div>
           </div>
         </div>
       </div>
     </section>
 
-    <footer style="text-align: center; color: var(--text-subtle); font-size: 0.8rem; margin-top: 40px;">
-      Sudar Fire & Rescue Response System Â· Java Servlets (Jakarta 6) Â· JDBC Â· MySQL Â· Dijkstra Pathfinding
+    <!-- ===================================================================== -->
+    <!-- TAB 4: MY PROFILE                                                     -->
+    <!-- ===================================================================== -->
+    <section id="tab-profile" class="tab-content">
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <h2>👤 My Profile &amp; Incident History</h2>
+            <p>All emergency incidents you reported are listed here with live status and assigned unit.</p>
+          </div>
+          <button class="btn secondary btn-sm" onclick="loadMyIncidents()">↻ Refresh</button>
+        </div>
+
+        <!-- Profile card -->
+        <div class="profile-card">
+          <div class="profile-avatar" id="profileAvatar">?</div>
+          <div class="profile-info">
+            <div class="profile-name" id="profileName">—</div>
+            <div class="profile-email" id="profileEmail">—</div>
+          </div>
+          <button class="btn secondary btn-sm" onclick="handleLogout()">Sign Out</button>
+        </div>
+
+        <!-- Incidents table -->
+        <div id="myIncidentsWrap">
+          <div id="myIncidentsEmpty" class="empty-state">
+            <div class="empty-icon">📋</div>
+            <div>No incidents reported yet.</div>
+            <button class="btn btn-sm" onclick="switchTab('tab-report')" style="margin-top:12px">Report an Emergency</button>
+          </div>
+          <div class="table-wrap hidden" id="myIncidentsTable">
+            <table>
+              <thead>
+                <tr>
+                  <th>Incident ID</th>
+                  <th>Type</th>
+                  <th>Location</th>
+                  <th>Severity</th>
+                  <th>Status</th>
+                  <th>Assigned Unit</th>
+                  <th>Tracking Token</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody id="myIncidentsTbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <footer class="app-footer">
+      Sudar Fire &amp; Rescue Response System · Java Servlets (Jakarta 6) · JDBC · MySQL · Dijkstra Pathfinding
     </footer>
+  </div><!-- /app-container -->
+
+  <!-- ===================================================================== -->
+  <!-- AUTH MODAL                                                            -->
+  <!-- ===================================================================== -->
+  <div id="authModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="authModalTitle">
+    <div class="modal-content auth-modal">
+      <div class="modal-header">
+        <h3 id="authModalTitle">Sign In</h3>
+        <button class="close-btn" onclick="closeAuthModal()" aria-label="Close">&times;</button>
+      </div>
+
+      <!-- Tab switcher inside modal -->
+      <div class="auth-tabs">
+        <button class="auth-tab active" id="authTabLogin" onclick="switchAuthTab('login')">Sign In</button>
+        <button class="auth-tab" id="authTabRegister" onclick="switchAuthTab('register')">Create Account</button>
+      </div>
+
+      <!-- LOGIN FORM -->
+      <form id="loginForm" class="auth-form" autocomplete="on">
+        <div class="form-group">
+          <label for="loginUsername">Username</label>
+          <input type="text" id="loginUsername" autocomplete="username" placeholder="Your username" required>
+        </div>
+        <div class="form-group">
+          <label for="loginPassword">Password</label>
+          <input type="password" id="loginPassword" autocomplete="current-password" placeholder="Your password" required>
+        </div>
+        <div id="loginError" class="form-error hidden"></div>
+        <button type="submit" class="btn btn-full btn-lg">Sign In &amp; Stay Signed In</button>
+        <p class="auth-hint">✅ You will stay signed in for 30 days across browser restarts.</p>
+      </form>
+
+      <!-- REGISTER FORM -->
+      <form id="registerForm" class="auth-form hidden" autocomplete="on">
+        <div class="form-group">
+          <label for="regUsername">Username</label>
+          <input type="text" id="regUsername" autocomplete="username" placeholder="Choose a username" required>
+        </div>
+        <div class="form-group">
+          <label for="regEmail">Email Address</label>
+          <input type="email" id="regEmail" autocomplete="email" placeholder="your@email.com" required>
+        </div>
+        <div class="form-group">
+          <label for="regPassword">Password <small>(min 6 characters)</small></label>
+          <input type="password" id="regPassword" autocomplete="new-password" placeholder="Choose a strong password" required minlength="6">
+        </div>
+        <div id="registerError" class="form-error hidden"></div>
+        <button type="submit" class="btn btn-full btn-lg">Create Account &amp; Sign In</button>
+        <p class="auth-hint">✅ Your incidents will be automatically saved to your profile.</p>
+      </form>
+    </div>
   </div>
 
   <script src="app.js"></script>

@@ -642,6 +642,13 @@ public final class RescueSystem {
 
         try (Connection c = Database.getConnection()) {
             logStatus(c, i.id, "Pending", "Incident reported by public user. Waiting for dispatch.", "PUBLIC");
+
+            // Auto-link to a citizen account if citizenId was supplied (logged-in user)
+            Object cidObj = body.get("citizenId");
+            if (cidObj instanceof Number) {
+                int cid = ((Number) cidObj).intValue();
+                claimIncident(c, cid, i.id, token);
+            }
         }
 
         Map<String, Object> out = result(true, "Incident reported successfully.");
@@ -1234,10 +1241,261 @@ public final class RescueSystem {
 
     private int number(Map<String, Object> b, String key, int min, int max) {
         try {
-            int n = Integer.parseInt(String.valueOf(b.get(key)));
+            Object val = b.get(key);
+            if (val == null) return -1;
+            // Gson deserializes JSON numbers as Double; convert safely
+            int n = (val instanceof Number) ? ((Number) val).intValue()
+                                            : Integer.parseInt(String.valueOf(val));
             return (n >= min && n <= max) ? n : -1;
         } catch (Exception e) {
             return -1;
+        }
+    }
+
+    // =========================================================================
+    // 11. CITIZEN AUTHENTICATION (PBKDF2 + Persistent Remember-Me Tokens)
+    // =========================================================================
+
+    /**
+     * Registers a new citizen. Returns {success, citizenId, username, email}.
+     * If incidentId + trackingToken are provided the incident is claimed immediately.
+     */
+    public Map<String, Object> registerCitizen(String username, String email,
+                                                String password,
+                                                String incidentId, String trackingToken)
+            throws SQLException {
+        if (username == null || username.isBlank())
+            return result(false, "Username is required.");
+        if (email == null || !email.contains("@"))
+            return result(false, "A valid e-mail address is required.");
+        if (password == null || password.length() < 6)
+            return result(false, "Password must be at least 6 characters.");
+
+        byte[] salt = generateSalt();
+        String saltStr = Base64.getEncoder().encodeToString(salt);
+        String hash = hashPassword(password, salt);
+
+        String sql = "INSERT INTO citizen_users(username, email, password_hash, salt) VALUES(?,?,?,?)";
+        try (Connection c = Database.getConnection();
+             PreparedStatement p = c.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+            p.setString(1, username.trim());
+            p.setString(2, email.trim().toLowerCase());
+            p.setString(3, hash);
+            p.setString(4, saltStr);
+            p.executeUpdate();
+            ResultSet keys = p.getGeneratedKeys();
+            if (!keys.next()) return result(false, "Registration failed unexpectedly.");
+            int citizenId = keys.getInt(1);
+
+            // Optionally claim the just-submitted incident
+            if (incidentId != null && !incidentId.isBlank()
+                    && trackingToken != null && !trackingToken.isBlank()) {
+                claimIncident(c, citizenId, incidentId, trackingToken);
+            }
+
+            Map<String, Object> out = result(true, "Account created successfully.");
+            out.put("citizenId", citizenId);
+            out.put("username", username.trim());
+            out.put("email", email.trim().toLowerCase());
+            return out;
+        } catch (SQLException e) {
+            if (e.getMessage() != null && e.getMessage().contains("Duplicate")) {
+                return result(false, "That username or e-mail is already registered.");
+            }
+            throw e;
+        }
+    }
+
+    /**
+     * Authenticates a citizen by username+password.
+     * Creates a 30-day remember-me token and returns it.
+     */
+    public Map<String, Object> loginCitizen(String username, String password) throws SQLException {
+        if (username == null || password == null)
+            return result(false, "Username and password are required.");
+
+        String sql = "SELECT id, username, email, password_hash, salt FROM citizen_users WHERE username=?";
+        try (Connection c = Database.getConnection();
+             PreparedStatement p = c.prepareStatement(sql)) {
+            p.setString(1, username.trim());
+            try (ResultSet r = p.executeQuery()) {
+                if (!r.next()) return result(false, "Invalid username or password.");
+
+                String storedHash = r.getString("password_hash");
+                byte[] salt = Base64.getDecoder().decode(r.getString("salt"));
+                if (!constantTimeEquals(storedHash, hashPassword(password, salt))) {
+                    return result(false, "Invalid username or password.");
+                }
+
+                int citizenId = r.getInt("id");
+                String rememberToken = createRememberToken(c, citizenId);
+
+                Map<String, Object> out = result(true, "Login successful.");
+                out.put("citizenId", citizenId);
+                out.put("username", r.getString("username"));
+                out.put("email", r.getString("email"));
+                out.put("rememberToken", rememberToken);
+                return out;
+            }
+        }
+    }
+
+    /**
+     * Verifies a persistent remember-me token.
+     * Rotates the token (issue new one, delete old) to limit replay window.
+     * Returns {success, citizenId, username, email, rememberToken}.
+     */
+    public Map<String, Object> verifyRememberToken(String token) throws SQLException {
+        if (token == null || token.isBlank()) return result(false, "Token required.");
+
+        String sql = "SELECT cs.citizen_id, cs.expires_at, cu.username, cu.email "
+                   + "FROM citizen_sessions cs "
+                   + "JOIN citizen_users cu ON cu.id = cs.citizen_id "
+                   + "WHERE cs.token=?";
+        try (Connection c = Database.getConnection();
+             PreparedStatement p = c.prepareStatement(sql)) {
+            p.setString(1, token.trim());
+            try (ResultSet r = p.executeQuery()) {
+                if (!r.next()) return result(false, "Session not found or expired.");
+
+                Timestamp expires = r.getTimestamp("expires_at");
+                if (expires.before(new Timestamp(System.currentTimeMillis()))) {
+                    // Clean up expired token
+                    deleteRememberToken(c, token);
+                    return result(false, "Session expired. Please log in again.");
+                }
+
+                int citizenId = r.getInt("citizen_id");
+                String username = r.getString("username");
+                String email = r.getString("email");
+
+                // Rotate: delete old, issue new
+                deleteRememberToken(c, token);
+                String newToken = createRememberToken(c, citizenId);
+
+                Map<String, Object> out = result(true, "Token valid.");
+                out.put("citizenId", citizenId);
+                out.put("username", username);
+                out.put("email", email);
+                out.put("rememberToken", newToken);
+                return out;
+            }
+        }
+    }
+
+    /** Revokes a specific remember-me token (logout). */
+    public void revokeRememberToken(String token) throws SQLException {
+        if (token == null || token.isBlank()) return;
+        try (Connection c = Database.getConnection()) {
+            deleteRememberToken(c, token);
+        }
+    }
+
+    /**
+     * Claims an anonymously-submitted incident for a citizen account.
+     * Requires valid trackingToken to prevent claim-jacking.
+     */
+    public Map<String, Object> claimIncidentForCitizen(int citizenId,
+                                                        String incidentId,
+                                                        String trackingToken)
+            throws SQLException {
+        if (incidentId == null || trackingToken == null)
+            return result(false, "Incident ID and tracking token are required.");
+
+        Incident inc = incidents.get(incidentId.trim());
+        if (inc == null || !trackingToken.trim().equals(inc.trackingToken))
+            return result(false, "Invalid incident reference or tracking token.");
+
+        try (Connection c = Database.getConnection()) {
+            claimIncident(c, citizenId, incidentId.trim(), trackingToken.trim());
+        }
+        Map<String, Object> out = result(true, "Incident linked to your profile.");
+        out.put("incidentId", incidentId);
+        return out;
+    }
+
+    /**
+     * Returns all incidents reported_by / claimed by this citizen,
+     * enriched with assigned unit information.
+     */
+    public List<Map<String, Object>> getMyIncidents(int citizenId) throws SQLException {
+        List<Map<String, Object>> list = new ArrayList<>();
+        String sql = "SELECT id FROM incidents WHERE reported_by=? ORDER BY created_at DESC";
+        try (Connection c = Database.getConnection();
+             PreparedStatement p = c.prepareStatement(sql)) {
+            p.setInt(1, citizenId);
+            try (ResultSet r = p.executeQuery()) {
+                while (r.next()) {
+                    String incId = r.getString("id");
+                    Incident inc = incidents.get(incId);
+                    if (inc == null) continue;
+
+                    Map<String, Object> row = inc.publicJson();
+                    // Include assigned unit summary if available
+                    if (!"None".equals(inc.assignedUnit) && units.containsKey(inc.assignedUnit)) {
+                        ResponseUnit u = units.get(inc.assignedUnit);
+                        Map<String, Object> unitSummary = new LinkedHashMap<>();
+                        unitSummary.put("id", u.id);
+                        unitSummary.put("type", u.type);
+                        unitSummary.put("location", u.location);
+                        unitSummary.put("status", u.status);
+                        row.put("assignedUnit", unitSummary);
+                    } else {
+                        row.put("assignedUnit", null);
+                    }
+                    list.add(row);
+                }
+            }
+        }
+        return list;
+    }
+
+    // ---- Private helpers ----
+
+    private String createRememberToken(Connection c, int citizenId) throws SQLException {
+        // Generate a 32-byte (256-bit) random hex token
+        byte[] raw = new byte[32];
+        RANDOM.nextBytes(raw);
+        StringBuilder sb = new StringBuilder();
+        for (byte b : raw) sb.append(String.format("%02x", b));
+        String token = sb.toString();
+
+        Timestamp expires = new Timestamp(System.currentTimeMillis() + 30L * 24 * 60 * 60 * 1000);
+        String sql = "INSERT INTO citizen_sessions(citizen_id, token, expires_at) VALUES(?,?,?)";
+        try (PreparedStatement p = c.prepareStatement(sql)) {
+            p.setInt(1, citizenId);
+            p.setString(2, token);
+            p.setTimestamp(3, expires);
+            p.executeUpdate();
+        }
+        return token;
+    }
+
+    private void deleteRememberToken(Connection c, String token) throws SQLException {
+        try (PreparedStatement p = c.prepareStatement(
+                "DELETE FROM citizen_sessions WHERE token=?")) {
+            p.setString(1, token);
+            p.executeUpdate();
+        }
+    }
+
+    private void claimIncident(Connection c, int citizenId,
+                                String incidentId, String trackingToken) throws SQLException {
+        // Only claim if not already owned by someone else
+        String check = "SELECT reported_by FROM incidents WHERE id=? AND tracking_token=?";
+        try (PreparedStatement p = c.prepareStatement(check)) {
+            p.setString(1, incidentId);
+            p.setString(2, trackingToken);
+            try (ResultSet r = p.executeQuery()) {
+                if (r.next() && r.getObject("reported_by") == null) {
+                    try (PreparedStatement u = c.prepareStatement(
+                            "UPDATE incidents SET reported_by=? WHERE id=?")) {
+                        u.setInt(1, citizenId);
+                        u.setString(2, incidentId);
+                        u.executeUpdate();
+                    }
+                }
+            }
         }
     }
 }

@@ -14,7 +14,8 @@ CREATE TABLE IF NOT EXISTS incidents (
   assigned_unit VARCHAR(20) NOT NULL DEFAULT 'None',
   description TEXT,
   tracking_token VARCHAR(64) NOT NULL,
-  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  reported_by INT DEFAULT NULL
 );
 
 CREATE TABLE IF NOT EXISTS response_units (
@@ -63,3 +64,25 @@ CREATE TABLE IF NOT EXISTS admin_users (
   salt VARCHAR(64) NOT NULL,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Citizen user accounts (optional profile for public portal users)
+CREATE TABLE IF NOT EXISTS citizen_users (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  username VARCHAR(60) UNIQUE NOT NULL,
+  email VARCHAR(120) UNIQUE NOT NULL,
+  password_hash VARCHAR(255) NOT NULL,
+  salt VARCHAR(64) NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Persistent remember-me tokens (30-day lifespan)
+CREATE TABLE IF NOT EXISTS citizen_sessions (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  citizen_id INT NOT NULL,
+  token VARCHAR(64) NOT NULL UNIQUE,
+  expires_at TIMESTAMP NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_token (token),
+  FOREIGN KEY (citizen_id) REFERENCES citizen_users(id) ON DELETE CASCADE
+);
+
