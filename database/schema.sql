@@ -11,7 +11,10 @@ CREATE TABLE IF NOT EXISTS incidents (
   critical BOOLEAN NOT NULL,
   arrival_order INT NOT NULL,
   status VARCHAR(20) NOT NULL,
-  assigned_unit VARCHAR(20) NOT NULL DEFAULT 'None'
+  assigned_unit VARCHAR(20) NOT NULL DEFAULT 'None',
+  description TEXT,
+  tracking_token VARCHAR(64) NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS response_units (
@@ -42,4 +45,21 @@ CREATE TABLE IF NOT EXISTS dispatch_history (
   route_text TEXT NOT NULL,
   travel_time INT NOT NULL,
   dispatched_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS status_history (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  incident_id VARCHAR(20) NOT NULL,
+  status VARCHAR(30) NOT NULL,
+  note TEXT,
+  source VARCHAR(20) NOT NULL DEFAULT 'SYSTEM',
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  INDEX idx_incident_id (incident_id)
+);
+
+CREATE TABLE IF NOT EXISTS admin_users (
+  username VARCHAR(50) PRIMARY KEY,
+  password_hash VARCHAR(255) NOT NULL,
+  salt VARCHAR(64) NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );

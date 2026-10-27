@@ -1,92 +1,264 @@
-const API = 'api';
+// Public Citizen Portal Client
+const API_BASE = 'api';
+
 const $ = (id) => document.getElementById(id);
-const esc = (value) => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-async function request(path, options={}) {
-  const response = await fetch(`${API}/${path}`, {
-    headers: {'Content-Type':'application/json', ...(options.headers||{})},
-    ...options
+const esc = (val) => String(val ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function notify(msg, type = 'info') {
+  const el = $('globalNotice');
+  if (!el) return;
+  el.textContent = msg;
+  el.className = `alert alert-${type}`;
+  el.classList.remove('hidden');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function clearNotice() {
+  const el = $('globalNotice');
+  if (el) el.classList.add('hidden');
+}
+
+// Navigation Tabs
+document.querySelectorAll('.nav-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    tab.classList.add('active');
+    const target = $(tab.dataset.tab);
+    if (target) target.classList.add('active');
   });
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.message || `Request failed (${response.status})`);
-  return data;
-}
-function notify(message, error=false) {
-  const el=$('notice'); el.textContent=message; el.classList.remove('hidden','error');
-  if(error) el.classList.add('error');
-}
-function statusBadge(status) {
-  const cls=String(status).toLowerCase().replace(/\s+/g,'-');
-  return `<span class="status s-${esc(cls)}">${esc(status)}</span>`;
-}
-function fillLocations(locations) {
-  const previous=$('location').value;
-  const selects=[...document.querySelectorAll('.location-select'),$('location')];
-  for(const select of selects) {
-    const old=select.value;
-    select.innerHTML=locations.map(l=>`<option value="${esc(l)}">${esc(l)}</option>`).join('');
-    if(locations.includes(old)) select.value=old;
-    else if(select=== $('location') && locations.includes(previous)) select.value=previous;
+});
+
+// Load Sudar Locations
+async function loadLocations() {
+  try {
+    const res = await fetch(`${API_BASE}/public/locations`);
+    const data = await res.json();
+    if (data.success && data.locations) {
+      const opts = data.locations.map(loc => `<option value="${esc(loc)}">${esc(loc)}</option>`).join('');
+      $('reportLocation').innerHTML = `<option value="">-- Select Incident Location --</option>${opts}`;
+      $('routeStart').innerHTML = `<option value="">-- Select Origin --</option>${opts}`;
+      $('routeEnd').innerHTML = `<option value="">-- Select Destination --</option>${opts}`;
+    }
+  } catch (err) {
+    notify('Failed to load locations from server. Please ensure backend is reachable.', 'error');
   }
 }
-function renderIncidents(incidents) {
-  $('incidentCount').textContent=incidents.length;
-  $('incidentRows').innerHTML=incidents.map(i=>`<tr>
-    <td><b>${esc(i.id)}</b></td><td>${esc(i.type)}</td><td>${esc(i.location)}</td>
-    <td>${esc(i.intensity)}/10</td><td>${esc(i.population)}</td>
-    <td>${i.critical?'Yes':'No'}</td><td>${statusBadge(i.status)}</td><td>${esc(i.assignedUnit)}</td>
-  </tr>`).join('') || '<tr><td colspan="8">No incidents recorded.</td></tr>';
-}
-function renderUnits(units) {
-  $('unitSelect').innerHTML=units.map(u=>`<option value="${esc(u.id)}">${esc(u.id)} — ${esc(u.type)} (${esc(u.status)})</option>`).join('');
-  $('unitCards').innerHTML=units.map(u=>`<article class="unit-card">
-    <div class="unit-top"><b>${esc(u.id)}</b><span class="${u.available?'available':'busy'}">● ${esc(u.status)}</span></div>
-    <div class="unit-type">${esc(u.type)}</div>
-    <p><b>Station:</b> ${esc(u.station)}</p><p><b>Current location:</b> ${esc(u.location)}</p>
-    <p><b>Incident:</b> ${esc(u.incidentId)}</p><p><b>Capabilities:</b> ${esc((u.capabilities||[]).join(', '))}</p>
-  </article>`).join('');
-}
-async function refresh() {
+
+// Report Incident Form
+$('publicReportForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  clearNotice();
+
+  const body = {
+    location: $('reportLocation').value,
+    type: $('reportType').value,
+    intensity: parseInt($('reportIntensity').value, 10),
+    population: parseInt($('reportPopulation').value, 10),
+    critical: $('reportCritical').checked,
+    description: $('reportDesc').value.trim()
+  };
+
   try {
-    const data=await request('dashboard');
-    renderIncidents(data.incidents);renderUnits(data.units);fillLocations(data.locations);
-    $('pendingCount').textContent=data.pendingCount;
-    $('activeCount').textContent=data.activeCount;
-    $('availableCount').textContent=data.units.filter(u=>u.available).length;
-  } catch(e) { notify(`${e.message} Check that Tomcat and MySQL are running and db.properties is configured.`,true); }
+    const res = await fetch(`${API_BASE}/public/incidents`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const data = await res.json();
+
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to submit incident.');
+    }
+
+    notify(`Incident reported successfully! Your Reference ID is ${data.incidentId}.`, 'success');
+    $('createdIncidentId').textContent = data.incidentId;
+    $('createdTrackingToken').textContent = data.trackingToken;
+    $('reportSuccessCard').classList.remove('hidden');
+
+    // Pre-fill tracking form
+    $('trackId').value = data.incidentId;
+    $('trackToken').value = data.trackingToken;
+
+    $('publicReportForm').reset();
+  } catch (err) {
+    notify(err.message, 'error');
+  }
+});
+
+// Copy Token Button
+$('copyTokenBtn').addEventListener('click', () => {
+  const token = $('createdTrackingToken').textContent;
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(token).then(() => {
+      notify('Tracking token copied to clipboard!', 'info');
+    });
+  } else {
+    notify(`Token: ${token}`, 'info');
+  }
+});
+
+// Quick Track Button
+$('quickTrackBtn').addEventListener('click', () => {
+  document.querySelector('[data-tab="tab-track"]').click();
+  $('trackForm').dispatchEvent(new Event('submit'));
+});
+
+// Track Incident Form
+$('trackForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  clearNotice();
+
+  const id = $('trackId').value.trim();
+  const token = $('trackToken').value.trim();
+
+  if (!id || !token) {
+    notify('Please enter both Incident ID and Tracking Token.', 'error');
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/public/track?id=${encodeURIComponent(id)}&token=${encodeURIComponent(token)}`);
+    const data = await res.json();
+
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Invalid Incident ID or Tracking Token.');
+    }
+
+    renderTrackResult(data);
+  } catch (err) {
+    notify(err.message, 'error');
+    $('trackResult').classList.add('hidden');
+  }
+});
+
+function renderTrackResult(data) {
+  const inc = data.incident;
+  $('trackDisplayId').textContent = inc.id;
+  $('trackDisplayLoc').textContent = inc.location;
+  $('trackDisplayType').textContent = inc.type;
+  $('trackDisplaySeverity').textContent = `${inc.intensity}/10 (${inc.population} people in danger)`;
+  $('trackDisplayCritical').textContent = inc.critical ? 'Yes (Critical Infrastructure)' : 'No';
+  $('trackDisplayDesc').textContent = `"${inc.description || 'No description provided.'}"`;
+
+  const statusEl = $('trackDisplayStatus');
+  statusEl.textContent = inc.status;
+  const statusCls = String(inc.status).toLowerCase().replace(/\s+/g, '-');
+  statusEl.className = `badge badge-${statusCls}`;
+
+  // Assigned Unit
+  if (data.assignedUnit) {
+    $('trackNoUnit').classList.add('hidden');
+    $('trackUnitDetails').classList.remove('hidden');
+
+    const u = data.assignedUnit;
+    $('trackUnitId').textContent = u.id;
+    $('trackUnitType').textContent = u.type;
+    $('trackUnitLoc').textContent = u.location;
+    $('trackUnitStatus').textContent = u.status;
+
+    // Render breadcrumbs
+    if (u.route && u.route.length > 0) {
+      $('trackRoutePath').innerHTML = u.route.map((node, idx) => {
+        const isActive = (node === u.location);
+        const arrow = idx < u.route.length - 1 ? '<span class="route-arrow">âž”</span>' : '';
+        return `<span class="route-node ${isActive ? 'active-node' : ''}">${esc(node)}</span>${arrow}`;
+      }).join(' ');
+    } else {
+      $('trackRoutePath').innerHTML = `<span class="tag">At ${esc(u.location)}</span>`;
+    }
+  } else {
+    $('trackNoUnit').classList.remove('hidden');
+    $('trackUnitDetails').classList.add('hidden');
+  }
+
+  // Render Timeline
+  renderTimeline(data.history || []);
+  $('trackResult').classList.remove('hidden');
 }
-async function post(path,body={}) {
-  const data=await request(path,{method:'POST',body:JSON.stringify(body)});
-  notify(data.message || 'Operation completed.',!data.success);
-  if(data.notification) notify(`${data.message} ${data.notification}`);
-  if(data.updates?.length) notify(`${data.message} ${data.updates.join(' | ')}`);
-  await refresh();
-  return data;
+
+function renderTimeline(history) {
+  const list = $('timelineList');
+  if (!history || history.length === 0) {
+    list.innerHTML = '<li class="timeline-item"><div class="timeline-content">No logged updates yet.</div></li>';
+    return;
+  }
+  list.innerHTML = history.map(item => `
+    <li class="timeline-item">
+      <div class="timeline-time">${esc(item.createdAt)} Â· <span class="tag">${esc(item.source)}</span></div>
+      <div class="timeline-content">
+        <b>[${esc(item.status)}]</b> ${esc(item.note)}
+      </div>
+    </li>
+  `).join('');
 }
-$('refresh').addEventListener('click',refresh);
-$('reportForm').addEventListener('submit',async e=>{
-  e.preventDefault();const f=new FormData(e.currentTarget);
-  try {const d=await post('incidents',{location:f.get('location'),type:f.get('type'),intensity:f.get('intensity'),population:f.get('population'),critical:f.has('critical')});
-    if(d.incident) notify(`${d.message} Incident ID: ${d.incident.id}`);
-    e.currentTarget.reset();await refresh();
-  } catch(err){notify(err.message,true);}
+
+// Witness Update Form
+$('witnessUpdateForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const id = $('trackId').value.trim();
+  const token = $('trackToken').value.trim();
+  const note = $('updateNoteText').value.trim();
+
+  if (!note) return;
+
+  try {
+    const res = await fetch(`${API_BASE}/public/incident-update`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, token, note })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Failed to submit update.');
+    }
+
+    notify('Citizen situation update posted!', 'success');
+    $('updateNoteText').value = '';
+    renderTimeline(data.history);
+  } catch (err) {
+    notify(err.message, 'error');
+  }
 });
-$('dispatchBtn').addEventListener('click',async()=>{try{const d=await post('dispatch');if(d.success&&d.route)notify(`${d.message} Route: ${d.route.path.join(' → ')}. Estimated travel time: ${d.route.time}. ${d.notification||''}`)}catch(e){notify(e.message,true)}});
-$('updateForm').addEventListener('submit',async e=>{
-  e.preventDefault();const f=new FormData(e.currentTarget);
-  try{await post('update',{id:f.get('id').trim(),intensity:f.get('intensity'),population:f.get('population'),critical:f.has('critical')});}catch(err){notify(err.message,true)}
+
+// Route Calculation Form
+$('publicRouteForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  clearNotice();
+
+  const start = $('routeStart').value;
+  const end = $('routeEnd').value;
+
+  if (!start || !end) {
+    notify('Please select both origin and destination.', 'error');
+    return;
+  }
+
+  if (start === end) {
+    notify('Origin and destination are the same location (0 min travel time).', 'info');
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API_BASE}/public/route?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`);
+    const data = await res.json();
+
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || 'Could not find a valid route.');
+    }
+
+    $('routeTravelTime').textContent = `Estimated Travel Time: ${data.route.time} minutes`;
+    $('routePathNodes').innerHTML = data.route.path.map((node, idx) => {
+      const arrow = idx < data.route.path.length - 1 ? '<span class="route-arrow">âž”</span>' : '';
+      return `<span class="route-node">${esc(node)}</span>${arrow}`;
+    }).join(' ');
+
+    $('routeOutput').classList.remove('hidden');
+  } catch (err) {
+    notify(err.message, 'error');
+    $('routeOutput').classList.add('hidden');
+  }
 });
-$('trackBtn').addEventListener('click',async()=>{try{const d=await post('track',{unitId:$('unitSelect').value});if(d.route)notify(`${d.message} Current route: ${d.route.path.join(' → ')}`)}catch(e){notify(e.message,true)}});
-$('completeBtn').addEventListener('click',async()=>{try{const d=await post('complete',{unitId:$('unitSelect').value});if(d.nextDispatch)notify(`${d.message} ${d.nextDispatch.message}`)}catch(e){notify(e.message,true)}});
-$('roadForm').addEventListener('submit',async e=>{
-  e.preventDefault();const f=new FormData(e.currentTarget);
-  if(f.get('from')===f.get('to')){notify('Choose two different locations.',true);return}
-  try{await post('close-road',{from:f.get('from'),to:f.get('to')})}catch(err){notify(err.message,true)}
-});
-$('routeForm').addEventListener('submit',async e=>{
-  e.preventDefault();const f=new FormData(e.currentTarget);
-  try{const d=await request(`route?start=${encodeURIComponent(f.get('start'))}&end=${encodeURIComponent(f.get('end'))}`);
-    const el=$('routeResult');el.classList.remove('hidden');
-    el.textContent=d.success?`Fastest route: ${d.route.path.join(' → ')} | Total travel time: ${d.route.time}`:d.message;
-  }catch(err){notify(err.message,true)}
-});
-refresh();
+
+// Initialize on page load
+loadLocations();

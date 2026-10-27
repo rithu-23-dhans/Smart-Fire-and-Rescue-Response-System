@@ -2,82 +2,256 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Smart Fire & Rescue Response System</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sudar Emergency Response Â· Citizen Portal</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <aside class="sidebar">
-    <div class="brand"><span class="brand-icon">✚</span><div><b>FIRE & RESCUE</b><small>RESPONSE COMMAND</small></div></div>
-    <nav>
-      <a class="active" href="#overview">▦ &nbsp; Overview</a>
-      <a href="#incidents">⚑ &nbsp; Incidents</a>
-      <a href="#units">🚒 &nbsp; Response Units</a>
-      <a href="#actions">⌁ &nbsp; Routes and recalculation</a>
-    </nav>
-    <div class="sidebar-note"><span class="pulse"></span> Local response system<br><small>Connected to Java backend</small></div>
-  </aside>
-  <main>
-    <header><div><p class="eyebrow">EMERGENCY OPERATIONS</p><h1>Response Dashboard</h1><p class="sub">Monitor incidents, coordinate response units, and manage routes.</p></div><button class="secondary" id="refresh">↻ Refresh data</button></header>
-    <section id="overview" class="stats">
-      <article class="stat"><span>Recorded incidents</span><strong id="incidentCount">—</strong><small>All statuses</small></article>
-      <article class="stat"><span>Pending incidents</span><strong id="pendingCount">—</strong><small>Ordered by priority</small></article>
-      <article class="stat"><span>Units deployed</span><strong id="activeCount">—</strong><small>Currently assigned</small></article>
-      <article class="stat"><span>Available units</span><strong id="availableCount">—</strong><small>Ready for dispatch</small></article>
-    </section>
-    <section class="panel" id="actions">
-      <div class="section-heading"><div><p class="eyebrow">OPERATIONS</p><h2>Incident actions</h2></div></div>
-      <div class="action-grid">
-        <form id="reportForm" class="action-card">
-          <h3>＋ Report incident</h3>
-          <label>Location<select name="location" id="location" required></select></label>
-          <label>Incident type<select name="type"><option>Fire</option><option>Industrial Fire</option><option>Rescue</option><option>Accident</option></select></label>
-          <div class="two"><label>Severity (1–10)<input name="intensity" type="number" min="1" max="10" value="5" required></label><label>People affected<input name="population" type="number" min="0" max="100000" value="1" required></label></div>
-          <label class="check"><input name="critical" type="checkbox"> Critical infrastructure affected</label>
-          <button type="submit">Register incident</button>
-        </form>
-        <div class="action-card">
-          <h3>🚒 Dispatch & mission</h3>
-          <p>Dispatch the highest-priority pending incident to the nearest available compatible unit.</p>
-          <button id="dispatchBtn">Dispatch next incident</button>
-          <div class="divider"></div>
-          <label>Unit ID<select id="unitSelect"></select></label>
-          <div class="two"><button class="secondary" id="trackBtn">Track unit</button><button class="secondary" id="completeBtn">Complete mission</button></div>
+  <div class="app-container">
+    <header class="app-header">
+      <div class="brand">
+        <div class="brand-icon">âœš</div>
+        <div class="brand-titles">
+          <h1>Sudar Fire & Rescue</h1>
+          <p>Emergency Response & Public Operations</p>
         </div>
-        <form id="updateForm" class="action-card">
-          <h3>⇅ Update pending priority</h3>
-          <label>Incident ID<input name="id" placeholder="e.g. I01" required></label>
-          <div class="two"><label>Severity<input name="intensity" type="number" min="1" max="10" required></label><label>People affected<input name="population" type="number" min="0" max="100000" required></label></div>
-          <label class="check"><input name="critical" type="checkbox"> Critical infrastructure affected</label>
-          <button type="submit">Update incident</button>
-        </form>
-        <form id="roadForm" class="action-card">
-          <h3>⛔ Close a road</h3>
-          <p>Close a direct connection and recalculate routes for active units.</p>
-          <label>First location<select name="from" class="location-select" required></select></label>
-          <label>Second location<select name="to" class="location-select" required></select></label>
-          <button type="submit" class="danger">Close road</button>
-        </form>
-        <form id="routeForm" class="action-card">
-          <h3>⌁ Find fastest route</h3>
-          <label>Starting location<select name="start" class="location-select" required></select></label>
-          <label>Destination<select name="end" class="location-select" required></select></label>
-          <button type="submit">Calculate route</button>
-          <div id="routeResult" class="result hidden"></div>
-        </form>
       </div>
-      <div id="notice" class="notice hidden" role="status"></div>
+      <div class="header-actions">
+        <div style="font-size: 0.85rem; color: var(--text-muted); text-align: right; margin-right: 8px;">
+          <div><b>EMERGENCY HOTLINE</b></div>
+          <div style="color: var(--danger); font-weight: bold; font-size: 1.05rem;">Dial 101 or 112</div>
+        </div>
+        <a href="admin.html" class="btn secondary">Admin Console ðŸ”’</a>
+      </div>
+    </header>
+
+    <div id="globalNotice" class="alert hidden" role="status"></div>
+
+    <nav class="nav-tabs" role="tablist">
+      <button class="nav-tab active" data-tab="tab-report">ðŸš¨ &nbsp; Report Emergency</button>
+      <button class="nav-tab" data-tab="tab-track">ðŸ” &nbsp; Track Incident & Unit</button>
+      <button class="nav-tab" data-tab="tab-route">ðŸ—ºï¸ &nbsp; Find Fastest Route</button>
+    </nav>
+
+    <!-- TAB 1: REPORT EMERGENCY INCIDENT -->
+    <main id="tab-report" class="tab-content active">
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <h2>Report an Emergency Incident</h2>
+            <p>Immediate public reporting. No login or registration required.</p>
+          </div>
+          <span class="badge badge-pending">Active Dispatch System</span>
+        </div>
+
+        <form id="publicReportForm">
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="reportLocation">Incident Location *</label>
+              <select id="reportLocation" name="location" required>
+                <option value="">Loading Sudar locations...</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="reportType">Emergency Type *</label>
+              <select id="reportType" name="type" required>
+                <option value="Fire">Fire (Structural / Residential)</option>
+                <option value="Industrial Fire">Industrial Fire (Chemical / High Hazard)</option>
+                <option value="Rescue">Rescue (Trapped Citizens / Evacuation)</option>
+                <option value="Accident">Accident (Road / Collision / Hazards)</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="reportIntensity">Severity Level (1 to 10) *</label>
+              <input type="number" id="reportIntensity" name="intensity" min="1" max="10" value="7" required>
+              <small style="color: var(--text-muted); display: block; margin-top: 4px;">
+                1â€“3: Minor Â· 4â€“6: Moderate Â· 7â€“8: Severe Â· 9â€“10: Critical Emergency
+              </small>
+            </div>
+
+            <div class="form-group">
+              <label for="reportPopulation">Estimated People in Danger *</label>
+              <input type="number" id="reportPopulation" name="population" min="0" max="100000" value="5" required>
+            </div>
+
+            <div class="form-group full-width">
+              <label class="checkbox-label">
+                <input type="checkbox" id="reportCritical" name="critical">
+                <span><b>Critical Infrastructure Affected</b> (Hospital, School, Power Station, Water Supply, Bridge)</span>
+              </label>
+            </div>
+
+            <div class="form-group full-width">
+              <label for="reportDesc">Situation Details & Landmarks</label>
+              <textarea id="reportDesc" name="description" rows="3" placeholder="Describe the scene, trapped individuals, spread of fire, or access road conditions..." required></textarea>
+            </div>
+          </div>
+
+          <div style="margin-top: 20px;">
+            <button type="submit" class="btn danger" style="padding: 12px 28px; font-size: 1rem;">
+              ðŸš¨ Submit Emergency Report
+            </button>
+          </div>
+        </form>
+
+        <!-- SUBMISSION SUCCESS CARD -->
+        <div id="reportSuccessCard" class="panel hidden" style="background: var(--bg-surface-elevated); margin-top: 24px; border-color: var(--success);">
+          <div class="panel-header" style="border-bottom-color: rgba(16, 185, 129, 0.3);">
+            <div>
+              <h3 style="color: var(--success);">âœ“ Incident Registered in System</h3>
+              <p>Keep your reference details safe to track response unit status.</p>
+            </div>
+          </div>
+          <div class="form-grid" style="margin-bottom: 16px;">
+            <div class="stat-card">
+              <span>Incident Reference ID</span>
+              <strong id="createdIncidentId" style="color: #38bdf8;">â€”</strong>
+            </div>
+            <div class="stat-card">
+              <span>Secure Tracking Token</span>
+              <strong id="createdTrackingToken" style="font-size: 1.25rem; font-family: monospace; color: #fbbf24;">â€”</strong>
+            </div>
+          </div>
+          <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <button type="button" id="copyTokenBtn" class="btn secondary">ðŸ“‹ Copy Tracking Token</button>
+            <button type="button" id="quickTrackBtn" class="btn">ðŸ” Track Response Unit Now</button>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- TAB 2: TRACK INCIDENT & UNIT -->
+    <section id="tab-track" class="tab-content">
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <h2>Track Incident & Response Unit</h2>
+            <p>Look up live response unit dispatch, current location, and incident timeline.</p>
+          </div>
+        </div>
+
+        <form id="trackForm" style="margin-bottom: 24px;">
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="trackId">Incident Reference ID</label>
+              <input type="text" id="trackId" placeholder="e.g. I01" required>
+            </div>
+            <div class="form-group">
+              <label for="trackToken">Secure Tracking Token</label>
+              <input type="text" id="trackToken" placeholder="e.g. tr_a1b2c3d4..." required>
+            </div>
+          </div>
+          <button type="submit" class="btn">ðŸ” Track Incident Status</button>
+        </form>
+
+        <div id="trackResult" class="hidden">
+          <div class="form-grid" style="margin-bottom: 24px;">
+            <!-- INCIDENT DETAILS -->
+            <div class="stat-card" style="grid-column: span 1;">
+              <span>Incident Details</span>
+              <div style="display: flex; align-items: center; gap: 10px; margin-top: 6px;">
+                <strong id="trackDisplayId" style="font-size: 1.5rem;">â€”</strong>
+                <span id="trackDisplayStatus" class="badge badge-pending">Pending</span>
+              </div>
+              <div class="unit-meta" style="margin-top: 10px;">
+                <div><span>Location:</span> <b id="trackDisplayLoc">â€”</b></div>
+                <div><span>Type:</span> <b id="trackDisplayType">â€”</b></div>
+                <div><span>Severity:</span> <b id="trackDisplaySeverity">â€”</b></div>
+                <div><span>Critical:</span> <b id="trackDisplayCritical">â€”</b></div>
+                <div style="margin-top: 6px; font-style: italic; color: var(--text-muted);" id="trackDisplayDesc">â€”</div>
+              </div>
+            </div>
+
+            <!-- UNIT DETAILS -->
+            <div class="stat-card" style="grid-column: span 1;">
+              <span>Assigned Response Unit</span>
+              <div id="trackNoUnit" style="color: var(--warning); padding: 10px 0;">
+                â³ Waiting for unit dispatch. Incident is prioritized in the emergency queue.
+              </div>
+              <div id="trackUnitDetails" class="hidden">
+                <div style="display: flex; align-items: center; gap: 10px; margin-top: 6px;">
+                  <strong id="trackUnitId" style="font-size: 1.5rem; color: #38bdf8;">â€”</strong>
+                  <span id="trackUnitType" class="badge badge-en-route">Fire Engine</span>
+                </div>
+                <div class="unit-meta" style="margin-top: 10px;">
+                  <div><span>Current Waypoint:</span> <b id="trackUnitLoc">â€”</b></div>
+                  <div><span>Mission Status:</span> <b id="trackUnitStatus">â€”</b></div>
+                </div>
+                <div style="margin-top: 8px;">
+                  <span style="font-size: 0.8rem; text-transform: uppercase;">Route Progress:</span>
+                  <div id="trackRoutePath" class="route-path"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- WITNESS / CITIZEN UPDATE -->
+          <div class="panel" style="background: var(--bg-surface-elevated); margin-bottom: 24px;">
+            <div class="panel-header">
+              <div>
+                <h3>Submit Citizen Situation Update</h3>
+                <p>Provide new observations, changed conditions, or access updates.</p>
+              </div>
+            </div>
+            <form id="witnessUpdateForm">
+              <div class="form-group">
+                <textarea id="updateNoteText" rows="2" placeholder="e.g. Fire has spread to the east annex; road is clear for entry from south gate..." required></textarea>
+              </div>
+              <button type="submit" class="btn secondary">Post Situation Update</button>
+            </form>
+          </div>
+
+          <!-- TIMELINE -->
+          <div>
+            <h3 style="margin-bottom: 12px; color: #fff;">Response Timeline & Audit Log</h3>
+            <ul id="timelineList" class="timeline"></ul>
+          </div>
+        </div>
+      </div>
     </section>
-    <section class="panel" id="incidents">
-      <div class="section-heading"><div><p class="eyebrow">PRIORITY QUEUE VIEW</p><h2>Incidents</h2></div><span class="pill">Sorted by original priority rules</span></div>
-      <div class="table-wrap"><table><thead><tr><th>ID</th><th>Incident</th><th>Location</th><th>Severity</th><th>People</th><th>Critical</th><th>Status</th><th>Unit</th></tr></thead><tbody id="incidentRows"></tbody></table></div>
+
+    <!-- TAB 3: ROUTE FINDER -->
+    <section id="tab-route" class="tab-content">
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <h2>Find Fastest Travel Route in Sudar</h2>
+            <p>Calculates the shortest travel-time path using Dijkstra's algorithm and live road network conditions.</p>
+          </div>
+        </div>
+
+        <form id="publicRouteForm" style="margin-bottom: 24px;">
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="routeStart">Origin Location</label>
+              <select id="routeStart" required></select>
+            </div>
+            <div class="form-group">
+              <label for="routeEnd">Destination</label>
+              <select id="routeEnd" required></select>
+            </div>
+          </div>
+          <button type="submit" class="btn">Calculate Fastest Route</button>
+        </form>
+
+        <div id="routeOutput" class="hidden">
+          <div class="stat-card">
+            <span>Fastest Route Result</span>
+            <div id="routeTravelTime" style="font-size: 1.5rem; font-weight: bold; color: #38bdf8; margin: 8px 0;">â€”</div>
+            <div style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 8px;">Waypoint Sequence:</div>
+            <div id="routePathNodes" class="route-path"></div>
+          </div>
+        </div>
+      </div>
     </section>
-    <section class="panel" id="units">
-      <div class="section-heading"><div><p class="eyebrow">FLEET STATUS</p><h2>Response units</h2></div></div>
-      <div id="unitCards" class="unit-grid"></div>
-    </section>
-    <footer>Smart Fire and Rescue Response System · Java Servlets · JDBC · MySQL</footer>
-  </main>
+
+    <footer style="text-align: center; color: var(--text-subtle); font-size: 0.8rem; margin-top: 40px;">
+      Sudar Fire & Rescue Response System Â· Java Servlets (Jakarta 6) Â· JDBC Â· MySQL Â· Dijkstra Pathfinding
+    </footer>
+  </div>
+
   <script src="app.js"></script>
 </body>
 </html>

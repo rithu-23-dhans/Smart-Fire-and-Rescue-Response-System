@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sudar Emergency Operations Command Â· Admin Console</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- LOGIN OVERLAY -->
+  <div id="loginModal" class="modal-overlay hidden">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>ðŸ”’ Administrator Authentication</h3>
+      </div>
+      <div id="loginAlert" class="alert alert-error hidden"></div>
+      <form id="adminLoginForm">
+        <div class="form-group">
+          <label for="loginUser">Administrator Username</label>
+          <input type="text" id="loginUser" value="admin" required autofocus>
+        </div>
+        <div class="form-group">
+          <label for="loginPass">Password</label>
+          <input type="password" id="loginPass" placeholder="Enter password..." required>
+        </div>
+        <div style="margin-top: 18px; display: flex; justify-content: space-between; align-items: center;">
+          <button type="submit" class="btn">Authenticate & Access Command</button>
+          <a href="index.html" class="btn secondary" style="font-size: 0.85rem;">â† Back to Citizen Portal</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- MAIN ADMIN APP -->
+  <div class="app-container" id="adminApp">
+    <header class="app-header">
+      <div class="brand">
+        <div class="brand-icon" style="background: linear-gradient(135deg, #2563eb, #1e40af);">âš¡</div>
+        <div class="brand-titles">
+          <h1>Sudar Operations Command</h1>
+          <p>Fleet Coordination & Priority Dispatch</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <div style="font-size: 0.85rem; color: var(--text-muted); text-align: right; margin-right: 8px;">
+          <div><span style="color: #34d399;">â—</span> Live Operations</div>
+          <div style="color: #fff; font-weight: 600;" id="userDisplay">Admin: admin</div>
+        </div>
+        <button id="refreshBtn" class="btn secondary">â†» Sync Data</button>
+        <button id="logoutBtn" class="btn secondary" style="color: #f87171;">â» Logout</button>
+        <a href="index.html" class="btn secondary" style="font-size: 0.85rem;">Citizen Portal âž”</a>
+      </div>
+    </header>
+
+    <div id="adminNotice" class="alert hidden" role="status"></div>
+
+    <!-- KPI STATS -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <span>Pending Incidents</span>
+        <strong id="statPending" style="color: #fbbf24;">â€”</strong>
+        <small>Priority queue queue size</small>
+      </div>
+      <div class="stat-card">
+        <span>Active Missions</span>
+        <strong id="statActive" style="color: #38bdf8;">â€”</strong>
+        <small>Units en route or reached</small>
+      </div>
+      <div class="stat-card">
+        <span>Completed</span>
+        <strong id="statCompleted" style="color: #34d399;">â€”</strong>
+        <small>Successfully resolved</small>
+      </div>
+      <div class="stat-card">
+        <span>Fleet Available</span>
+        <strong id="statAvailable" style="color: #10b981;">â€”</strong>
+        <small id="statTotalUnits">4 Units Total</small>
+      </div>
+      <div class="stat-card">
+        <span>Closed Roads</span>
+        <strong id="statClosedRoads" style="color: #f87171;">â€”</strong>
+        <small>Active closures</small>
+      </div>
+    </div>
+
+    <!-- TABS -->
+    <nav class="nav-tabs">
+      <button class="nav-tab active" data-tab="tab-dispatch">âš¡ &nbsp; Priority Dispatch</button>
+      <button class="nav-tab" data-tab="tab-fleet">ðŸš’ &nbsp; Fleet Tracking</button>
+      <button class="nav-tab" data-tab="tab-registry">ðŸ“‹ &nbsp; Master Incident Registry</button>
+      <button class="nav-tab" data-tab="tab-roads">â›” &nbsp; Road Network & Closures</button>
+    </nav>
+
+    <!-- SECTION 1: PRIORITY DISPATCH -->
+    <section id="tab-dispatch" class="tab-content active">
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <h2>Priority Dispatch Operations</h2>
+            <p>Strict ordering: Severity (10-1) âž” Critical Flag âž” Population âž” Arrival Order</p>
+          </div>
+          <button id="autoDispatchBtn" class="btn danger" style="padding: 10px 22px;">
+            ðŸš’ Auto-Dispatch Next Priority Incident
+          </button>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Queue #</th>
+                <th>Incident ID</th>
+                <th>Location</th>
+                <th>Type</th>
+                <th>Severity</th>
+                <th>Critical</th>
+                <th>Population</th>
+                <th>Arrival Order</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="queueTableBody">
+              <tr><td colspan="9" style="text-align: center; color: var(--text-muted);">Loading pending queue...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- REPRIORITIZE MODAL / FORM -->
+      <div class="panel" style="background: var(--bg-surface-elevated);">
+        <div class="panel-header">
+          <div>
+            <h3>Modify Incident Priority</h3>
+            <p>Reprioritizing updates position in the PriorityQueue using the exact comparator.</p>
+          </div>
+        </div>
+        <form id="reprioritizeForm">
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="reId">Incident ID</label>
+              <input type="text" id="reId" placeholder="e.g. I01" required>
+            </div>
+            <div class="form-group">
+              <label for="reIntensity">Severity (1 to 10)</label>
+              <input type="number" id="reIntensity" min="1" max="10" value="8" required>
+            </div>
+            <div class="form-group">
+              <label for="rePopulation">People in Danger</label>
+              <input type="number" id="rePopulation" min="0" max="100000" value="10" required>
+            </div>
+            <div class="form-group full-width">
+              <label class="checkbox-label">
+                <input type="checkbox" id="reCritical">
+                <span>Critical Infrastructure Affected</span>
+              </label>
+            </div>
+          </div>
+          <button type="submit" class="btn">Update Priority & Reorganize Queue</button>
+        </form>
+      </div>
+    </section>
+
+    <!-- SECTION 2: FLEET TRACKING & MISSIONS -->
+    <section id="tab-fleet" class="tab-content">
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <h2>Emergency Response Fleet (4 Units)</h2>
+            <p>Monitor unit statuses, advance road segments, and complete missions.</p>
+          </div>
+        </div>
+        <div id="fleetCards" class="unit-grid"></div>
+      </div>
+    </section>
+
+    <!-- SECTION 3: MASTER INCIDENT REGISTRY -->
+    <section id="tab-registry" class="tab-content">
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <h2>Master Incident Registry</h2>
+            <p>Complete historical database of all incidents.</p>
+          </div>
+          <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <input type="text" id="registrySearch" placeholder="Search ID, location, details..." style="width: 220px;">
+            <select id="registryFilterStatus" style="width: 150px;">
+              <option value="ALL">All Statuses</option>
+              <option value="Pending">Pending</option>
+              <option value="En Route">En Route</option>
+              <option value="Reached">Reached</option>
+              <option value="Completed">Completed</option>
+            </select>
+            <select id="registryFilterType" style="width: 150px;">
+              <option value="ALL">All Types</option>
+              <option value="Fire">Fire</option>
+              <option value="Industrial Fire">Industrial Fire</option>
+              <option value="Rescue">Rescue</option>
+              <option value="Accident">Accident</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Location</th>
+                <th>Type</th>
+                <th>Severity</th>
+                <th>Critical</th>
+                <th>Status</th>
+                <th>Assigned Unit</th>
+                <th>Tracking Token</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="registryTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- SECTION 4: ROAD NETWORK & CLOSURES -->
+    <section id="tab-roads" class="tab-content">
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <h2>Road Network & Closure Management</h2>
+            <p>Closing or reopening a road connection dynamically recalculates active unit routes.</p>
+          </div>
+        </div>
+
+        <div id="roadAlertBox" class="alert alert-info hidden"></div>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Road Connection</th>
+                <th>Travel Time</th>
+                <th>Network Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="roadsTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- AUDIT TIMELINE MODAL -->
+    <div id="timelineModal" class="modal-overlay hidden">
+      <div class="modal-content" style="max-width: 680px;">
+        <div class="modal-header">
+          <h3 id="timelineModalTitle">Incident Audit Timeline</h3>
+          <button type="button" class="close-btn" id="closeTimelineBtn">&times;</button>
+        </div>
+        <ul id="adminTimelineList" class="timeline"></ul>
+      </div>
+    </div>
+
+    <!-- MANUAL DISPATCH MODAL -->
+    <div id="manualDispatchModal" class="modal-overlay hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 id="manualDispatchTitle">Manual Incident Dispatch</h3>
+          <button type="button" class="close-btn" id="closeManualBtn">&times;</button>
+        </div>
+        <form id="manualDispatchForm">
+          <input type="hidden" id="manualIncidentId">
+          <div class="form-group">
+            <label>Select Response Unit</label>
+            <select id="manualUnitSelect" required></select>
+          </div>
+          <button type="submit" class="btn danger">Dispatch Selected Unit</button>
+        </form>
+      </div>
+    </div>
+
+    <footer style="text-align: center; color: var(--text-subtle); font-size: 0.8rem; margin-top: 40px;">
+      Sudar Emergency Operations Command Â· Administrator Session Protected Â· MySQL 8 InnoDB
+    </footer>
+  </div>
+
+  <script src="admin.js"></script>
+</body>
+</html>

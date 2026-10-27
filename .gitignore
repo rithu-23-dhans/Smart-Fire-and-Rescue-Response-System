@@ -1,0 +1,20 @@
+backend/target/
+*.class
+*.jar
+*.war
+
+# Backup files
+*.bak
+
+# IDE & Editor files
+.idea/
+*.iml
+.vscode/
+.settings/
+.project
+.classpath
+
+# OS files
+.DS_Store
+Thumbs.db
+
