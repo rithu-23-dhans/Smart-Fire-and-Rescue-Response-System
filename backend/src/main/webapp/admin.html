@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Sudar Emergency Operations Command Â· Admin Console</title>
+  <title>Sudar Emergency Operations Command - Admin Console</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -11,7 +11,7 @@
   <div id="loginModal" class="modal-overlay hidden">
     <div class="modal-content">
       <div class="modal-header">
-        <h3>ðŸ”’ Administrator Authentication</h3>
+        <h3>Administrator Login</h3>
       </div>
       <div id="loginAlert" class="alert alert-error hidden"></div>
       <form id="adminLoginForm">
@@ -24,8 +24,8 @@
           <input type="password" id="loginPass" placeholder="Enter password..." required>
         </div>
         <div style="margin-top: 18px; display: flex; justify-content: space-between; align-items: center;">
-          <button type="submit" class="btn">Authenticate & Access Command</button>
-          <a href="index.html" class="btn secondary" style="font-size: 0.85rem;">â† Back to Citizen Portal</a>
+          <button type="submit" class="btn">Login</button>
+          <a href="index.html" class="btn secondary" style="font-size: 0.85rem;">Back to Citizen Portal</a>
         </div>
       </form>
     </div>
@@ -35,20 +35,25 @@
   <div class="app-container" id="adminApp">
     <header class="app-header">
       <div class="brand">
-        <div class="brand-icon" style="background: linear-gradient(135deg, #2563eb, #1e40af);">âš¡</div>
+        <div class="brand-icon" style="background: linear-gradient(135deg, #2563eb, #1e40af);">
+          <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M16 2L4 7V16C4 22.627 9.373 28 16 28C22.627 28 28 22.627 28 16V7L16 2Z" fill="white" fill-opacity="0.2"/>
+            <path d="M18 6L12 17H16L14 26L22 13H17L18 6Z" fill="white"/>
+          </svg>
+        </div>
         <div class="brand-titles">
           <h1>Sudar Operations Command</h1>
-          <p>Fleet Coordination & Priority Dispatch</p>
+          <p>Fleet Coordination and Priority Dispatch</p>
         </div>
       </div>
       <div class="header-actions">
         <div style="font-size: 0.85rem; color: var(--text-muted); text-align: right; margin-right: 8px;">
-          <div><span style="color: #34d399;">â—</span> Live Operations</div>
-          <div style="color: #fff; font-weight: 600;" id="userDisplay">Admin: admin</div>
+          <div><span style="color: #16a34a;">&#9679;</span> Live Operations</div>
+          <div style="color: var(--text-main); font-weight: 600;" id="userDisplay">Admin: admin</div>
         </div>
-        <button id="refreshBtn" class="btn secondary">â†» Sync Data</button>
-        <button id="logoutBtn" class="btn secondary" style="color: #f87171;">â» Logout</button>
-        <a href="index.html" class="btn secondary" style="font-size: 0.85rem;">Citizen Portal âž”</a>
+        <button id="refreshBtn" class="btn secondary">Sync Data</button>
+        <button id="logoutBtn" class="btn secondary" style="color: #dc2626;">Logout</button>
+        <a href="index.html" class="btn secondary" style="font-size: 0.85rem;">Citizen Portal</a>
       </div>
     </header>
 
@@ -58,37 +63,37 @@
     <div class="stats-grid">
       <div class="stat-card">
         <span>Pending Incidents</span>
-        <strong id="statPending" style="color: #fbbf24;">â€”</strong>
-        <small>Priority queue queue size</small>
+        <strong id="statPending" style="color: #d97706;">-</strong>
+        <small>Awaiting dispatch</small>
       </div>
       <div class="stat-card">
         <span>Active Missions</span>
-        <strong id="statActive" style="color: #38bdf8;">â€”</strong>
+        <strong id="statActive" style="color: #2563eb;">-</strong>
         <small>Units en route or reached</small>
       </div>
       <div class="stat-card">
         <span>Completed</span>
-        <strong id="statCompleted" style="color: #34d399;">â€”</strong>
+        <strong id="statCompleted" style="color: #16a34a;">-</strong>
         <small>Successfully resolved</small>
       </div>
       <div class="stat-card">
         <span>Fleet Available</span>
-        <strong id="statAvailable" style="color: #10b981;">â€”</strong>
+        <strong id="statAvailable" style="color: #16a34a;">-</strong>
         <small id="statTotalUnits">4 Units Total</small>
       </div>
       <div class="stat-card">
         <span>Closed Roads</span>
-        <strong id="statClosedRoads" style="color: #f87171;">â€”</strong>
+        <strong id="statClosedRoads" style="color: #dc2626;">-</strong>
         <small>Active closures</small>
       </div>
     </div>
 
     <!-- TABS -->
     <nav class="nav-tabs">
-      <button class="nav-tab active" data-tab="tab-dispatch">âš¡ &nbsp; Priority Dispatch</button>
-      <button class="nav-tab" data-tab="tab-fleet">ðŸš’ &nbsp; Fleet Tracking</button>
-      <button class="nav-tab" data-tab="tab-registry">ðŸ“‹ &nbsp; Master Incident Registry</button>
-      <button class="nav-tab" data-tab="tab-roads">â›” &nbsp; Road Network & Closures</button>
+      <button class="nav-tab active" data-tab="tab-dispatch">Priority Dispatch</button>
+      <button class="nav-tab" data-tab="tab-fleet">Fleet Tracking</button>
+      <button class="nav-tab" data-tab="tab-registry">Incident Registry</button>
+      <button class="nav-tab" data-tab="tab-roads">Road Network</button>
     </nav>
 
     <!-- SECTION 1: PRIORITY DISPATCH -->
@@ -97,10 +102,9 @@
         <div class="panel-header">
           <div>
             <h2>Priority Dispatch Operations</h2>
-            <p>Strict ordering: Severity (10-1) âž” Critical Flag âž” Population âž” Arrival Order</p>
           </div>
           <button id="autoDispatchBtn" class="btn danger" style="padding: 10px 22px;">
-            ðŸš’ Auto-Dispatch Next Priority Incident
+            Auto-Dispatch Next Priority Incident
           </button>
         </div>
 
@@ -155,18 +159,17 @@
               </label>
             </div>
           </div>
-          <button type="submit" class="btn">Update Priority & Reorganize Queue</button>
+          <button type="submit" class="btn">Update Priority and Reorganize Queue</button>
         </form>
       </div>
     </section>
 
-    <!-- SECTION 2: FLEET TRACKING & MISSIONS -->
+    <!-- SECTION 2: FLEET TRACKING -->
     <section id="tab-fleet" class="tab-content">
       <div class="panel">
         <div class="panel-header">
           <div>
             <h2>Emergency Response Fleet (4 Units)</h2>
-            <p>Monitor unit statuses, advance road segments, and complete missions.</p>
           </div>
         </div>
         <div id="fleetCards" class="unit-grid"></div>
@@ -221,12 +224,12 @@
       </div>
     </section>
 
-    <!-- SECTION 4: ROAD NETWORK & CLOSURES -->
+    <!-- SECTION 4: ROAD NETWORK -->
     <section id="tab-roads" class="tab-content">
       <div class="panel">
         <div class="panel-header">
           <div>
-            <h2>Road Network & Closure Management</h2>
+            <h2>Road Network and Closure Management</h2>
             <p>Closing or reopening a road connection dynamically recalculates active unit routes.</p>
           </div>
         </div>
@@ -279,7 +282,7 @@
     </div>
 
     <footer style="text-align: center; color: var(--text-subtle); font-size: 0.8rem; margin-top: 40px;">
-      Sudar Emergency Operations Command Â· Administrator Session Protected Â· MySQL 8 InnoDB
+      Sudar Emergency Operations Command. Administrator Session Protected.
     </footer>
   </div>
 

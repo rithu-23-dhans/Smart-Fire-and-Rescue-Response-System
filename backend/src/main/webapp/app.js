@@ -99,6 +99,7 @@ async function checkAuthSession() {
     if (newToken) storeToken(newToken);
     if (data.success && data.loggedIn) {
       setAuthState(data.citizenId, data.username, data.email, newToken || savedToken);
+      resetIdleTimer();
     } else {
       localStorage.removeItem(AUTH_TOKEN_KEY);
     }
@@ -110,12 +111,15 @@ async function checkAuthSession() {
 function setAuthState(citizenId, username, email, rememberToken) {
   authState = { loggedIn: true, citizenId, username, email, rememberToken };
   renderAuthHeader();
+  resetIdleTimer();
 }
 
 function clearAuthState() {
   authState = { loggedIn: false, citizenId: null, username: null, email: null, rememberToken: null };
   localStorage.removeItem(AUTH_TOKEN_KEY);
   renderAuthHeader();
+  clearTimeout(idleTimer);
+  clearTimeout(idleWarnTimer);
 }
 
 function renderAuthHeader() {
@@ -316,7 +320,7 @@ $('publicReportForm').addEventListener('submit', async (e) => {
 
   const btn = $('btnSubmitReport');
   btn.disabled = true;
-  btn.textContent = '⏳ Submitting…';
+  btn.textContent = 'Submitting...';
 
   try {
     const res = await fetch(`${API_BASE}/public/incidents`, {
@@ -330,7 +334,7 @@ $('publicReportForm').addEventListener('submit', async (e) => {
 
     if (!res.ok || !data.success) throw new Error(data.message || 'Failed to submit incident.');
 
-    notify(`🚨 Incident reported! Reference ID: ${data.incidentId}`, 'success');
+    notify(`Incident reported! Reference ID: ${data.incidentId}`, 'success');
     $('createdIncidentId').textContent  = data.incidentId;
     $('createdTrackingToken').textContent = data.trackingToken;
     $('reportSuccessCard').classList.remove('hidden');
@@ -347,7 +351,7 @@ $('publicReportForm').addEventListener('submit', async (e) => {
     notify(err.message, 'error');
   } finally {
     btn.disabled = false;
-    btn.textContent = '🚨 Submit Emergency Report';
+    btn.textContent = 'Submit Report';
   }
 });
 
@@ -356,7 +360,7 @@ function renderPostReportSection(incidentId, trackingToken) {
   const el = $('postReportLink');
   if (authState.loggedIn) {
     // Already linked via backend; just show confirmation
-    el.innerHTML = `<div class="post-report-linked">✅ Incident automatically saved to your profile, <b>${esc(authState.username)}</b>.</div>`;
+    el.innerHTML = `<div class="post-report-linked">Incident automatically saved to your profile, <b>${esc(authState.username)}</b>.</div>`;
     el.classList.remove('hidden');
     return;
   }
@@ -366,7 +370,7 @@ function renderPostReportSection(incidentId, trackingToken) {
 
   el.innerHTML = `
     <div class="post-report-prompt">
-      <div class="post-report-icon">💡</div>
+      <div class="post-report-icon">&#128161;</div>
       <div class="post-report-text">
         <b>Save this incident to a profile</b> so you can track it anytime — even after closing the browser.
       </div>
@@ -414,6 +418,46 @@ $('trackForm').addEventListener('submit', async (e) => {
   }
 });
 
+// ============================================================
+// STATUS EXPLAINER HELPER
+// ============================================================
+function getStatusExplanation(status) {
+  const s = String(status).toLowerCase().trim();
+  if (s === 'pending') return {
+    icon: 'hourglass',
+    color: '#d97706',
+    bg: '#fffbeb',
+    border: '#fde68a',
+    title: 'Waiting for Dispatch',
+    detail: 'Your incident has been received and logged. A response unit will be assigned shortly based on emergency priority.'
+  };
+  if (s === 'en route' || s === 'en-route') return {
+    icon: 'truck',
+    color: '#2563eb',
+    bg: '#eff6ff',
+    border: '#bfdbfe',
+    title: 'Response Unit On the Way',
+    detail: 'A fire and rescue unit has been dispatched and is travelling to your location right now.'
+  };
+  if (s === 'reached') return {
+    icon: 'check-circle',
+    color: '#7c3aed',
+    bg: '#f5f3ff',
+    border: '#ddd6fe',
+    title: 'Unit Has Arrived at Scene',
+    detail: 'The response unit has reached the incident location and emergency operations are underway.'
+  };
+  if (s === 'completed') return {
+    icon: 'check-all',
+    color: '#16a34a',
+    bg: '#f0fdf4',
+    border: '#bbf7d0',
+    title: 'Incident Resolved',
+    detail: 'This incident has been successfully resolved. The response unit has completed its mission.'
+  };
+  return { icon: 'info', color: '#64748b', bg: '#f8fafc', border: '#e2e8f0', title: status, detail: '' };
+}
+
 function renderTrackResult(data) {
   const inc = data.incident;
   $('trackDisplayId').textContent       = inc.id;
@@ -427,6 +471,28 @@ function renderTrackResult(data) {
   statusEl.textContent = inc.status;
   statusEl.className   = `badge badge-${String(inc.status).toLowerCase().replace(/\s+/g, '-')}`;
 
+  // Status explainer card
+  const exp = getStatusExplanation(inc.status);
+  const statusCard = $('statusExplainerCard');
+  if (statusCard) {
+    statusCard.style.background = exp.bg;
+    statusCard.style.borderColor = exp.border;
+    statusCard.querySelector('.se-title').textContent = exp.title;
+    statusCard.querySelector('.se-detail').textContent = exp.detail;
+    statusCard.querySelector('.se-title').style.color = exp.color;
+    statusCard.classList.remove('hidden');
+  }
+
+  // Completed banner
+  const completedBanner = $('completedBanner');
+  if (completedBanner) {
+    if (String(inc.status).toLowerCase() === 'completed') {
+      completedBanner.classList.remove('hidden');
+    } else {
+      completedBanner.classList.add('hidden');
+    }
+  }
+
   if (data.assignedUnit) {
     $('trackNoUnit').classList.add('hidden');
     $('trackUnitDetails').classList.remove('hidden');
@@ -438,7 +504,7 @@ function renderTrackResult(data) {
     if (u.route && u.route.length > 0) {
       $('trackRoutePath').innerHTML = u.route.map((node, idx) => {
         const isActive = (node === u.location);
-        const arrow = idx < u.route.length - 1 ? '<span class="route-arrow">➔</span>' : '';
+        const arrow = idx < u.route.length - 1 ? '<span class="route-arrow">&rsaquo;</span>' : '';
         return `<span class="route-node ${isActive ? 'active-node' : ''}">${esc(node)}</span>${arrow}`;
       }).join(' ');
     } else {
@@ -507,7 +573,7 @@ $('publicRouteForm').addEventListener('submit', async (e) => {
     if (!res.ok || !data.success) throw new Error(data.message || 'Could not find a valid route.');
     $('routeTravelTime').textContent = `Estimated Travel Time: ${data.route.time} minutes`;
     $('routePathNodes').innerHTML = data.route.path.map((node, idx) => {
-      const arrow = idx < data.route.path.length - 1 ? '<span class="route-arrow">➔</span>' : '';
+      const arrow = idx < data.route.path.length - 1 ? '<span class="route-arrow">&rsaquo;</span>' : '';
       return `<span class="route-node">${esc(node)}</span>${arrow}`;
     }).join(' ');
     $('routeOutput').classList.remove('hidden');
@@ -550,21 +616,25 @@ function renderMyIncidents(incidents) {
 
   tbody.innerHTML = incidents.map(inc => {
     const statusCls = String(inc.status).toLowerCase().replace(/\s+/g, '-');
+    const isCompleted = String(inc.status).toLowerCase() === 'completed';
     const unit = inc.assignedUnit
       ? `<span class="unit-mini">${esc(inc.assignedUnit.id)} <small>(${esc(inc.assignedUnit.type)} · ${esc(inc.assignedUnit.status)})</small></span>`
-      : `<span class="text-muted">—</span>`;
+      : `<span class="text-muted">-</span>`;
     const shortToken = inc.trackingToken
-      ? `<span class="mono token-short" title="${esc(inc.trackingToken)}">${esc(inc.trackingToken.slice(0, 12))}…</span>`
-      : '—';
-    return `<tr>
+      ? `<span class="mono token-short" title="${esc(inc.trackingToken)}">${esc(inc.trackingToken.slice(0, 12))}...</span>`
+      : '-';
+    const statusBadge = isCompleted
+      ? `<span class="badge badge-completed">Resolved</span>`
+      : `<span class="badge badge-${statusCls}">${esc(inc.status)}</span>`;
+    return `<tr class="${isCompleted ? 'row-completed' : ''}">
       <td><b>${esc(inc.id)}</b></td>
       <td>${esc(inc.type)}</td>
       <td>${esc(inc.location)}</td>
       <td><span class="severity-badge sev-${Math.min(Math.ceil(inc.intensity / 2), 5)}">${inc.intensity}/10</span></td>
-      <td><span class="badge badge-${statusCls}">${esc(inc.status)}</span></td>
+      <td>${statusBadge}</td>
       <td>${unit}</td>
       <td>${shortToken}</td>
-      <td><button class="btn btn-sm" onclick="quickTrackIncident('${esc(inc.id)}','${esc(inc.trackingToken)}')">🔍 Track</button></td>
+      <td><button class="btn btn-sm" onclick="quickTrackIncident('${esc(inc.id)}','${esc(inc.trackingToken)}')">Track</button></td>
     </tr>`;
   }).join('');
 }
@@ -575,6 +645,30 @@ function quickTrackIncident(id, token) {
   switchTab('tab-track');
   $('trackForm').dispatchEvent(new Event('submit'));
 }
+
+// ============================================================
+// INACTIVITY AUTO-LOGOUT (30 min idle = warning, then logout)
+// ============================================================
+const IDLE_TIMEOUT_MS  = 30 * 60 * 1000; // 30 minutes
+const IDLE_WARN_MS     = 29 * 60 * 1000; // warn at 29 min
+let idleTimer, idleWarnTimer;
+
+function resetIdleTimer() {
+  if (!authState.loggedIn) return;
+  clearTimeout(idleTimer);
+  clearTimeout(idleWarnTimer);
+  idleWarnTimer = setTimeout(() => {
+    notify('You have been inactive for 29 minutes. You will be signed out in 1 minute unless you interact.', 'info');
+  }, IDLE_WARN_MS);
+  idleTimer = setTimeout(() => {
+    handleLogout();
+    notify('You were signed out due to inactivity. Please sign in again.', 'info');
+  }, IDLE_TIMEOUT_MS);
+}
+
+['mousemove','keydown','click','touchstart','scroll'].forEach(evt =>
+  document.addEventListener(evt, resetIdleTimer, { passive: true })
+);
 
 // ============================================================
 // INIT

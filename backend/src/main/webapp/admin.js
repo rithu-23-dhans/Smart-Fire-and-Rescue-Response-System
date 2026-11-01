@@ -13,6 +13,11 @@ function notify(msg, type = 'info') {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
+// Alias for admin alert (used by notification system)
+function showAdminAlert(msg, type = 'info') {
+  notify(msg, type);
+}
+
 function clearNotice() {
   const el = $('adminNotice');
   if (el) el.classList.add('hidden');
@@ -28,6 +33,28 @@ document.querySelectorAll('.nav-tab').forEach(tab => {
     if (target) target.classList.add('active');
   });
 });
+
+// ============================================================
+// ADMIN NOTIFICATION FOR NEW INCIDENTS
+// ============================================================
+let _lastPendingCount = null;
+function checkForNewIncidents(pendingCount) {
+  if (_lastPendingCount !== null && pendingCount > _lastPendingCount) {
+    const diff = pendingCount - _lastPendingCount;
+    showAdminAlert(`${diff} new incident${diff > 1 ? 's' : ''} reported. Review and dispatch immediately.`, 'warning');
+    // Also show browser notification if permitted
+    if (Notification.permission === 'granted') {
+      new Notification('Sudar Fire and Rescue', {
+        body: `${diff} new emergency incident${diff > 1 ? 's' : ''} reported. Action required.`,
+        icon: ''
+      });
+    }
+  }
+  _lastPendingCount = pendingCount;
+}
+
+// Request notification permission on admin page load
+if (Notification.permission === 'default') Notification.requestPermission();
 
 // Authentication Management
 async function checkAuth() {
@@ -95,7 +122,7 @@ function loadAll() {
   loadRoads();
 }
 
-// 1. Dashboard & Fleet Data
+// 1. Dashboard and Fleet Data
 async function loadDashboard() {
   try {
     const res = await fetch(`${API_BASE}/admin/dashboard`);
@@ -111,6 +138,9 @@ async function loadDashboard() {
     $('statCompleted').textContent = data.completedCount;
     $('statAvailable').textContent = `${data.availableUnits} / ${data.totalUnits}`;
     $('statClosedRoads').textContent = data.closedRoads;
+
+    // Check for new incidents
+    checkForNewIncidents(data.pendingCount);
 
     // Render Queue
     const pendingIncidents = (data.incidents || []).filter(i => i.status === 'Pending');
@@ -133,10 +163,10 @@ function renderQueueTable(pending, allUnits) {
   tbody.innerHTML = pending.map((inc, idx) => `
     <tr>
       <td><b>#${idx + 1}</b></td>
-      <td><b style="color: #38bdf8;">${esc(inc.id)}</b></td>
+      <td><b style="color: #2563eb;">${esc(inc.id)}</b></td>
       <td>${esc(inc.location)}</td>
       <td>${esc(inc.type)}</td>
-      <td><b style="color: ${inc.intensity >= 8 ? '#f87171' : '#fbbf24'};">${esc(inc.intensity)}/10</b></td>
+      <td><b style="color: ${inc.intensity >= 8 ? '#dc2626' : '#d97706'};">${esc(inc.intensity)}/10</b></td>
       <td>${inc.critical ? '<span class="badge badge-busy">Critical</span>' : 'No'}</td>
       <td>${esc(inc.population)}</td>
       <td>${esc(inc.arrivalOrder)}</td>
@@ -165,7 +195,7 @@ function renderFleet(units) {
 
     const routeBreadcrumbs = (u.route && u.route.length > 0)
       ? `<div class="route-path" style="margin-top: 8px;">` +
-        u.route.map(node => `<span class="route-node ${node === u.location ? 'active-node' : ''}">${esc(node)}</span>`).join('<span class="route-arrow">âž”</span>') +
+        u.route.map(node => `<span class="route-node ${node === u.location ? 'active-node' : ''}">${esc(node)}</span>`).join('<span class="route-arrow">&rsaquo;</span>') +
         `</div>`
       : `<span class="tag">At Station</span>`;
 
@@ -175,14 +205,14 @@ function renderFleet(units) {
           <div class="unit-card-header">
             <div>
               <h3>${esc(u.id)}</h3>
-              <div class="unit-type">${esc(u.type)} Â· Base: ${esc(u.station)}</div>
+              <div class="unit-type">${esc(u.type)} - Base: ${esc(u.station)}</div>
             </div>
-            <span class="badge ${statusCls}">â— ${esc(u.status)}</span>
+            <span class="badge ${statusCls}">${esc(u.status)}</span>
           </div>
 
           <div class="unit-meta">
             <div><span>Current Waypoint:</span> <b>${esc(u.location)}</b></div>
-            <div><span>Active Incident:</span> <b style="color: ${hasMission ? '#38bdf8' : 'var(--text-muted)'};">${esc(u.incidentId)}</b></div>
+            <div><span>Active Incident:</span> <b style="color: ${hasMission ? '#2563eb' : 'var(--text-muted)'};">${esc(u.incidentId)}</b></div>
             <div style="margin-top: 6px;">
               <span>Capabilities:</span><br>
               ${(u.capabilities || []).map(c => `<span class="tag">${esc(c)}</span>`).join('')}
@@ -196,8 +226,8 @@ function renderFleet(units) {
 
         <div class="unit-actions">
           ${hasMission ? `
-            <button class="btn secondary" style="flex: 1;" onclick="trackStep('${esc(u.id)}')">âž” Advance 1 Step</button>
-            <button class="btn success" style="flex: 1;" onclick="completeMission('${esc(u.id)}')">âœ“ Complete Mission</button>
+            <button class="btn secondary" style="flex: 1;" onclick="trackStep('${esc(u.id)}')">Advance 1 Step</button>
+            <button class="btn success" style="flex: 1;" onclick="completeMission('${esc(u.id)}')">Complete Mission</button>
           ` : `
             <span style="font-size: 0.8rem; color: var(--text-muted); padding: 8px;">Ready for assignment</span>
           `}
@@ -237,7 +267,7 @@ window.completeMission = async function(unitId) {
     if (!res.ok || !data.success) throw new Error(data.message || 'Mission completion failed.');
     let msg = data.message;
     if (data.nextDispatch && data.nextDispatch.success) {
-      msg += ` Â· Next dispatch: ${data.nextDispatch.message}`;
+      msg += ` Next dispatch: ${data.nextDispatch.message}`;
     }
     notify(msg, 'success');
     loadDashboard();
@@ -276,7 +306,7 @@ window.openManualDispatch = async function(incidentId, incidentType) {
     if (available.length === 0) {
       select.innerHTML = `<option value="">No compatible available units (${incidentType})</option>`;
     } else {
-      select.innerHTML = available.map(u => `<option value="${esc(u.id)}">${esc(u.id)} â€” ${esc(u.type)} (at ${esc(u.location)})</option>`).join('');
+      select.innerHTML = available.map(u => `<option value="${esc(u.id)}">${esc(u.id)} - ${esc(u.type)} (at ${esc(u.location)})</option>`).join('');
     }
     $('manualDispatchModal').classList.remove('hidden');
   } catch (e) {
@@ -352,7 +382,7 @@ $('reprioritizeForm').addEventListener('submit', async (e) => {
   }
 });
 
-// 2. Incident Registry & Audit Log
+// 2. Incident Registry and Audit Log
 async function loadRegistry() {
   const search = $('registrySearch').value;
   const status = $('registryFilterStatus').value;
@@ -389,10 +419,10 @@ function renderRegistryTable(incidents) {
         <td><b>${esc(inc.intensity)}/10</b></td>
         <td>${inc.critical ? '<span class="badge badge-busy">Yes</span>' : 'No'}</td>
         <td><span class="badge badge-${statusCls}">${esc(inc.status)}</span></td>
-        <td>${inc.assignedUnit === 'None' ? '<span style="color: var(--text-subtle);">None</span>' : `<b style="color: #38bdf8;">${esc(inc.assignedUnit)}</b>`}</td>
-        <td><code style="font-size: 0.8rem; color: #fbbf24;">${esc(inc.trackingToken)}</code></td>
+        <td>${inc.assignedUnit === 'None' ? '<span style="color: var(--text-subtle);">None</span>' : `<b style="color: #2563eb;">${esc(inc.assignedUnit)}</b>`}</td>
+        <td><code style="font-size: 0.8rem; color: #d97706;">${esc(inc.trackingToken)}</code></td>
         <td>
-          <button class="btn secondary" style="padding: 4px 8px; font-size: 0.8rem;" onclick="viewAuditTimeline('${esc(inc.id)}')">ðŸ“œ Timeline</button>
+          <button class="btn secondary" style="padding: 4px 8px; font-size: 0.8rem;" onclick="viewAuditTimeline('${esc(inc.id)}')">Timeline</button>
         </td>
       </tr>
     `;
@@ -411,7 +441,7 @@ window.viewAuditTimeline = async function(incidentId) {
     } else {
       list.innerHTML = data.history.map(item => `
         <li class="timeline-item">
-          <div class="timeline-time">${esc(item.createdAt)} Â· <span class="tag">${esc(item.source)}</span></div>
+          <div class="timeline-time">${esc(item.createdAt)} · <span class="tag">${esc(item.source)}</span></div>
           <div class="timeline-content"><b>[${esc(item.status)}]</b> ${esc(item.note)}</div>
         </li>
       `).join('');
@@ -446,10 +476,10 @@ function renderRoadsTable(roads) {
 
   tbody.innerHTML = roads.map(r => `
     <tr>
-      <td><b>${esc(r.from)}</b> âŸ· <b>${esc(r.to)}</b></td>
+      <td><b>${esc(r.from)}</b> &harr; <b>${esc(r.to)}</b></td>
       <td>${esc(r.travelTime)} minutes</td>
       <td>
-        ${r.active ? '<span class="badge badge-completed">â— Open</span>' : '<span class="badge badge-busy">â›” Closed</span>'}
+        ${r.active ? '<span class="badge badge-completed">Open</span>' : '<span class="badge badge-busy">Closed</span>'}
       </td>
       <td>
         ${r.active ? `
@@ -476,7 +506,7 @@ window.toggleRoad = async function(from, to, action) {
     const alertEl = $('roadAlertBox');
     let message = data.message;
     if (data.updates && data.updates.length > 0) {
-      message += '<br><strong>Fleet Route Recalculations:</strong><br>' + data.updates.map(u => `â€¢ ${esc(u)}`).join('<br>');
+      message += '<br><strong>Fleet Route Recalculations:</strong><br>' + data.updates.map(u => `- ${esc(u)}`).join('<br>');
     }
     alertEl.innerHTML = message;
     alertEl.classList.remove('hidden');
